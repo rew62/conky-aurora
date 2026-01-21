@@ -1,0 +1,171 @@
+-- sidepanel-2.rc - Conky Sidepanel with Lua Analog Clock-Weather-System-CPU-Memory-File System-Network
+-- v3 04 2026-01-19 @rew62
+
+conky.config = {
+  --Various settings
+
+  -- background = false, 				-- forked to background
+  -- cpu_avg_samples = 2,				-- The number of samples to average for CPU monitoring. 
+  -- diskio_avg_samples = 10,			-- The number of samples to average for disk I/O monitoring. 
+  double_buffer = true,				-- Use the Xdbe extension? (eliminates flicker) 
+  -- if_up_strictness = 'address',			-- how strict if testing interface is up - up, link or address
+  -- net_avg_samples = 2,				-- The number of samples to average for net data 
+  no_buffers = true,				-- Subtract (file system) buffers from used memory? 
+  -- temperature_unit = 'celsius',			-- fahrenheit or celsius
+  text_buffer_size = 2048,			-- size of buffer for display of content of large variables - default 256
+  update_interval = 1,				-- update interval
+  -- imlib_cache_size = 0,                       	-- disable image cache to get a new spotify cover per song
+  
+  --Placement
+  
+  alignment = 'top_right',			-- top-left,top-middle,top-right,bottom-left,bottom-middle,bottom-right,
+  						-- middle-left,middle-middle,middle-right,none
+  gap_x = 10,					-- pixels between right or left border
+  gap_y = 10,					-- pixels between bottom or left border
+  minimum_height = 800,				-- minimum height of window
+  minimum_width = 200,				-- minimum height of window
+  maximum_width = 200,				-- maximum height of window
+  
+  --Graphical
+  
+  border_inner_margin = 5, 			-- margin between border and text
+  -- border_outer_margin = 1, 			-- margin between border and edge of window
+  border_width = 1, 				-- border width in pixels
+  default_bar_width = 80,			-- default is 0 - full width					
+  default_bar_height = 5,			-- default is 6
+  -- default_gauge_height = 25,			-- default is 25
+  -- default_gauge_width =40,			-- default is 40
+  default_graph_width = 80,			-- default is 0 - full width
+  default_graph_height = 15,			-- default is 25
+  -- default_shade_color = '#000000',		-- default shading colour
+  -- default_outline_color = '#000000',		-- default outline colour
+  draw_borders = true,				-- draw borders around text
+  -- draw_graph_borders = true,			-- draw borders around graphs
+  -- draw_shades = false,			-- draw shades
+  -- draw_outline = false,			-- draw outline
+  -- stippled_borders = 0,			-- dashing the border
+  
+  --Textual
+  	
+  -- extra_newline = false,			-- extra newline at the end - for asesome's wiboxes
+  -- format_human_readable = true,		-- KiB, MiB rather then number of bytes
+  -- font = 'SourceSansPro-ExtraLight:size=11:oblique',  -- font for complete conky unless in code defined
+  -- max_text_width = 0,			-- 0 will make sure line does not get broken if width too smal
+  -- max_user_text = 16384,			-- max text in conky default 16384
+  override_utf8_locale = true,			-- force UTF8 requires xft
+  short_units = true,				-- shorten units from KiB to k
+  -- top_name_width = 21,			-- width for $top name value default 15
+  -- top_name_verbose = false,			-- If true, top name shows the full command line of  each  process - Default value is false.
+  -- uppercase = false,				-- uppercase or not
+  -- use_spacer = 'none',			-- adds spaces around certain objects to align - default none
+  use_xft = true,				-- xft font - anti-aliased font
+  xftalpha = 1,					-- alpha of the xft font - between 0-1
+  
+  --Windows
+  
+  own_window = true,				-- create your own window to draw
+  -- --own_window_argb_value = 150,		-- real transparency - composite manager required 0-255
+  own_window_argb_visual = true,		-- use ARGB - composite manager required
+  own_window_class = 'Conky',			-- manually set the WM_CLASS name for use with xprop
+  own_window_colour = 'FFFFFF',			-- set colour if own_window_transparent no
+  own_window_hints = 'undecorated,below,above,sticky,skip_taskbar,skip_pager',  -- if own_window true - just hints - own_window_type sets it
+  own_window_transparent = true,		-- True/False. If own_window_argb_visual is true sets background opacity 0%
+  -- own_window_title = 'system_conky',		-- set the name manually  - default conky "hostname"
+  own_window_type = 'panel',			-- if own_window true options are: normal/override/dock/desktop/panel
+  	
+  --Colours
+  
+  -- --default_color = 'black',  		-- default color and border color
+  default_color = '8FBC8F',
+  -- color1 = '#888888', 
+  -- color2 = '#AAAAAA', 
+  -- color3 = '#cccccc', 
+  -- color4 = '#BDBDBD',
+  -- color5 = '#CCCCCC', 
+  -- color6 = '#aa0000',
+  color1 = '98FB98',  -- PaleGreen
+  color2 = '2E8B57',  -- SeaGreen
+  color3 = 'ADFF2F',  -- GreenYellow
+  color4 = 'ECF0F1',  -- white
+  color5 = 'F0E68C',  -- khaki1
+   
+  -- --Signal Colours
+  -- color7 = '#1F7411',  				--green
+  -- color8 = '#FFA726',  				--orange
+  -- color9 = '#F1544B',  				--firebrick
+  
+  -- Fonts (Renumbered)
+  font = 'Ubuntu Mono',
+  font2 = 'JetBrains Mono:bold:size=9',
+  font3 = 'Fira Code:size=10',
+  font4 = 'Liberation Sans:size=11',
+  font5 = 'IBM Plex Mono:size=11',
+  font6 = 'Noto Sans:size=14',
+  font7 = 'DejaVu Sans:size=11',
+   
+  -- Templates
+  template1 = "eth0",					-- LAN interface name
+  template2 = [[${color1}\1: ${color4}]],
+
+  -- Lua Scripts
+      lua_load = './scripts/master_loader.lua',
+      lua_draw_hook_post = 'main_hub 40 40 28', -- Call the hub function and pass the clock parameters
+};
+
+conky.text = [[
+${execi 1800 ./scripts/update-moon.sh}\
+${color4}${alignr}${font :size=16}${time %r}${font}
+#----------------------- Weather -----------------------
+${alignc}${execpi 300 ./scripts/weather.lua}
+#----------------------- Earth -----------------------
+#${voffset 5}${color1}${font3}EARTH: ${voffset -5}______${voffset 5}${alignr}${font DejaVu Sans:size=8}${color4}${execi 10 date -r /dev/shm/earth.png "+%m/%d/%Y %I:%M%p" | sed 's/AM/a/;s/PM/p/'}
+#${image /dev/shm/earth.png -p 35, 220 -s 140x140 -n}
+#${voffset 116}
+#----------------------- Moon -----------------------
+#${color1}${font3}MOON: --${font3}${voffset -10}
+#${if_existing /dev/shm/net_error}${font Symboloa:size=8}${color red}${goto 5}● ${else}${font Symbola:size=3}${color green}${goto 15}●${endif}
+#${voffset -26}${execpi 300 cat /dev/shm/moon-data.txt 2>/dev/null || cat $HOME/.conky/rew62/sidepanel/.cache/moon-data.bak 2>/dev/null}
+#${image /dev/shm/moon.jpg -p 20, 360 -s 65x65 -n}
+#-----------------------System Information -----------------------
+${voffset 10} \
+${font Good Times:size=10}${color1}SYSTEM:${voffset -5} ___________  ${voffset 5}$alignr${voffset -3}${offset -5}${color #86BE43}${font Hack Nerd Font:size=18}󰣭
+${voffset -12}$font3}${template2 Uptime}$alignr$uptime_short
+${template2 User}$alignr${color4}${exec whoami}@$nodename
+${template2 OS}$alignr${color4}${execi 86400 lsb_release -ds}${color1}
+${template2 Kernel}$alignr${kernel}
+${template2 DE}$alignr${exec echo $XDG_CURRENT_DESKTOP} (${execi 3600 xrandr --current | grep -oP '\d+x\d+(?=.+\*)'})
+#${template2 Model}
+#----------------------- CPU -----------------------
+# CPU0
+${voffset 4}${font Good Times:size=10}${color1}CPU:${voffset -4} ____________________________ ${voffset 4}
+${font3}${color orange}${execi 86400 grep -m1 -oP '^model name\s+:\s+\K.*' /proc/cpuinfo}
+${template2 Processes}${goto 80}${execi 2 bash -lc 'ps -Ao pid= | wc -l'} $alignr${color1}Running: ${color4}${execi 2 bash -lc 'ps -Ao state= | tr -cd R | wc -c'}
+${template2 Load}$alignr${freq_g}GHz - ${cpu cpu0}%
+#${color1}Proc:${color4} $processes $alignr${color1}Load:${color4} $loadavg
+${lua gradbar {8, 405, "${cpu cpu0}", 100, 65, 2, 20, 1, 0xFFFFFF, 0.25, 0x00FF00, 1, 0xFFFF00, 1, 0xFF0000, 1}}
+${voffset 3}${goto 8}${cpugraph cpu0 20,194 40DA66 FF1493}
+${color}Name             CPU%   MEM%   PID
+${font2}${color1} ${top name 1} ${goto 80}${color4}${top cpu 1} ${goto 120}${top mem 1} ${goto 160}${top pid 1}
+${color1} ${top name 2} ${goto 80}${color4}${top cpu 2} ${goto 120}${top mem 2} ${goto 160}${top pid 2}
+${color1} ${top name 3} ${goto 80}${color4}${top cpu 3} ${goto 120}${top mem 3} ${goto 160}${top pid 3}
+#${color}CPU %:${color1} $cpu% ${cpubar cpu0 5,525}${alignr}${color}CPU Frequency:${color1} $freq${color} MHz
+#----------------------- MEMORY -----------------------
+${voffset 4}${font Good Times:size=10}${color1}MEMORY:${voffset -4} ____________________________ ${voffset 4}
+${font3}${template2 RAM}$alignr${mem}  ${memmax}
+${lua gradbar {6, 575, "${memperc}", 100, 65, 2, 15, 1, 0xFFFFFF, 0.25, 0x00FF00, 1, 0xFFFF00, 1, 0xFF0000, 1}}
+#${font2}${color1}${mem} / ${buffers} / ${memmax}${alignr}${swap} / ${swapmax}
+#${color}RAM Used/Buffers/Max:${alignr}Swap Used/Max:
+${voffset 4}${font Good Times:size=10}${color1}FILE SYSTEM:${voffset -4} ____________________________ ${voffset 4}
+${font3}${color1}File Sys:$alignr Used / Free / Max
+$alignr${color4}${fs_free /} / ${fs_used /} / ${fs_size /}
+${voffset 15}${font3}${color1}Disk I/O:${goto 70}${color1}R: ${color4}${diskio_read}${goto 130}${color1}W: ${color4}${diskio_write }
+${lua gradbar {6, 655, "${fs_used_perc}", 100, 65, 2, 15, 1, 0xFFFFFF, 0.25, 0x00FF00, 1, 0xFFFF00, 1, 0xFF0000, 1}}
+#----------------------- Network -----------------------
+${voffset -15}${font Good Times:size=10}${color1}NETWORK:${font DejaVu Sans Mono:size=10}${voffset -5} ________ ${voffset 5}${font3}${alignr}${color4}${gw_iface}
+${voffset -2}${if_up ${template1}}${template2 LAN_IP}$alignr${addr ${gw_iface}}
+${template2 WAN_IP}$alignr${texeci 86400 curl -s https://api.ipify.org}
+${color1}${font PizzaDude Bullets:size=10}O${font3}${voffset -3} Up: ${color4}${upspeed ${template1}} ${goto 110}${color1}${font PizzaDude Bullets:size=10}U${voffset -3}${font3} Down: $alignr${color4}${downspeed ${template1}}
+${voffset -5}${upspeedgraph ${template1} 20,95 0000FF 00FFFF -t}${alignr}${downspeedgraph ${template1} 20,95 FFFF00 FF4500 -t}$color
+${voffset -11}${color3}Total: ${color #00FFFF}${totalup ${template1}} ${alignr}${color3}Total: ${color #FF4500}${totaldown ${template1}}
+${voffset -6}${color1}In: ${color4}${tcp_portmon 1 32767 count}${color1}   Out: ${color4}${tcp_portmon 32768 61000 count}${alignr}${color1}Total: ${color4}${tcp_portmon 1 65535 count}${endif}
+${voffset -40}]]
