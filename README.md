@@ -1,3 +1,8 @@
+![License](https://img.shields.io/github/license/rew62/conky-aurora)
+![Stars](https://img.shields.io/github/stars/rew62/conky-aurora)
+![Issues](https://img.shields.io/github/issues/rew62/conky-aurora)
+![Last Commit](https://img.shields.io/github/last-commit/rew62/conky-aurora)
+
 # Conky Scripts Collection
 
 A set of Conky scripts built on Linux Mint v22.2 (Zara)
@@ -5,7 +10,7 @@ A set of Conky scripts built on Linux Mint v22.2 (Zara)
 ## Credits
 
 - **allcombined.lua** - Created by mrpeachy
-- **All other scripts** - Created by Bob Webb (@rew62)
+- **All other scripts** - Created by R Webb (@rew62)
 
 ## Scripts Overview
 
@@ -29,7 +34,7 @@ The [fourmilab.ch](http://www.fourmilab.ch) site was developed by John Walker, f
 
 ### /dev/shm Usage
 
-These scripts use `/dev/shm/`, a virtual filesystem (tmpfs) that uses RAM for storing temporary files, saving wear and tear on your SSD. All Debian systems mount `/dev/shm` by default.
+These scripts use `/dev/shm/`, a virtual filesystem (tmpfs) that uses RAM for storing temporary files, saving wear and tear on your SSD. All Debian based systems include Ubunto, and Mint mount `/dev/shm` by default.
 
 **Check if /dev/shm is available on your system.** If not mounted in your distro, you'll need to edit the scripts to use your preferred temp directory.
 
@@ -72,16 +77,14 @@ Install the fonts located in the `fonts` directory.
       lat=YOUR LATITUDE
       lon=YOUR LONGITUDE
    ```
-
+Edit `scripts/sidepanel/weather.lua line 10:` `local cf = "imperial"` or `local cf = "metric"`
+Imperial units are the default.
 
 ### 5. Configure Network Interface
 
 Edit `sidepanel/sidepanel-1.rc` and `sidepanel/sidepanel-2.rc` → `${template1}` to match your primary network interface name.
 
-**Get interface name:**
-```bash
-ip link
-```
+**You can obtain the interface name by typing:  `ip link`
 
 ### 6. Set Up Cron Job to generate an Image of the Earth every 10 mintes.
 
@@ -100,9 +103,7 @@ crontab < earth/crontab
 ```
 
 - Verify installation:
-      ```bash
-      crontab -l
-      ```
+      `crontab -l`
 
 ### 7. Set Up gcalcli
    1. Setup project for gcalcli at https://console.cloud.google.com
