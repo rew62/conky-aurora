@@ -1,4 +1,4 @@
-${font Fira Code:size=10}${color4}${alignr}Waxing Crescent - 4%${font}
+${font Fira Code:size=10}${color4}${alignr}Waxing Crescent - 16%${font}
 ${alignr}${color1}${font Fira Code:size=10}Next Full Moon:${font}
 ${voffset -5}${alignr}${color4}${font Ubuntu Mono:size=10}Feb 02, 2026${font}
 ${alignr}${color1}${font Fira Code:size=10}Next New Moon:${font}

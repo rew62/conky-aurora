@@ -2,9 +2,12 @@
 # nws-scrape.sh v2 02 2026-01-20 @rew62
 # openweathermap does not provide daytime high and low. This script grabs that information from nws.
 
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 #Get lat and lon from env
-LAT=$(sed -n 's/^lat=//p' ../../.env)
-LON=$(sed -n 's/^lon=//p' ../../.env)
+LAT=$(sed -n 's/^lat=//p' "$SCRIPT_DIR/../../.env")
+LON=$(sed -n 's/^lon=//p' "$SCRIPT_DIR/../../.env")
 #echo $LAT, $LON
 
 # tmpfs location

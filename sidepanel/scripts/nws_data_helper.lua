@@ -15,7 +15,7 @@ function M.refresh()
     if now - last_update >= update_interval then
         -- Run the shell script in the BACKGROUND (&) 
         -- and redirect its output to a temp file in RAM
-        os.execute(HOME .. "/.conky/rew62/sidepanel/scripts/nws-scrape.sh > " .. data_file .. " &")
+        os.execute(HOME .. "/.conky/rew62/sidepanel/scripts/nws-scrape.sh > " .. data_file)
         last_update = now
     end
 
