@@ -70,23 +70,30 @@ Install the fonts located in the `fonts` directory.
       - Your city ID
       - Your measurement units: `'metric'` (Celsius, m/s) or `'imperial'` (Fahrenheit, mph)
 
-### 4. Create a .env file in the root of this script directory. Include your keys and secrets:
-   ```
-      apikey="YOUR OPENWEATHER API KEY"
-      cityid="YOUR CITY ID"
-      lat=YOUR LATITUDE
-      lon=YOUR LONGITUDE
-   ```
-Edit `scripts/sidepanel/weather.lua line 10:` `local cf = "imperial"` or `local cf = "metric"`
-Imperial units are the default.
 
-### 5. Configure Network Interface
+### 4. Run Configuration Script to create a .env file with your keys
 
-Edit `sidepanel/sidepanel-1.rc` and `sidepanel/sidepanel-2.rc` → `${template1}` to match your primary network interface name.
+The `.env` file requires these keys:
+- `apikey` - Your API key from openweathermap.org
+- `cityid` - Your city ID
+- `lat` - Latitude (decimal format)
+- `lon` - Longitude (decimal format)
 
-**You can obtain the interface name by typing:  `ip link`
+See `.env-example` for the format reference.
 
-### 6. Set Up Cron Job to generate an Image of the Earth every 10 mintes.
+### Running the configuration script
+```bash
+./config.sh
+```
+
+The script will:
+1. Load existing values from `.env` if present
+2. Prompt for each configuration value (press Enter to keep existing/default)
+3. Attempt to Auto-detect your network interface
+4. Ask for confirmation before writing
+5. Update `.env`, weather.lua, and sidepanel files with values entered.
+
+### 5. Set Up Cron Job to generate an Image of the Earth every 10 mintes.
 
 1. Edit `earth/crontab` and replace <user> with your home directory name.
 
@@ -96,7 +103,6 @@ Edit `sidepanel/sidepanel-1.rc` and `sidepanel/sidepanel-2.rc` → `${template1}
    */10 * * * * /home/<user>/.conky/rew62/earth/fourmilab-earth.sh > /dev/shm/cron_debug.log 2>&1
    ```
 
-
 2. Install the crontab:
 ```bash
 crontab < earth/crontab
@@ -105,7 +111,7 @@ crontab < earth/crontab
 - Verify installation:
       `crontab -l`
 
-### 7. Set Up gcalcli
+### 6. Set Up gcalcli
    1. Setup project for gcalcli at https://console.cloud.google.com
    2. Setup OAUTH and obtain tokens
    3. Run ```gcalcli list``` to initalize OAuth. Use the tokens you generate to authorize gcalcli.

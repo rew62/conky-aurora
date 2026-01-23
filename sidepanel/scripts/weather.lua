@@ -1,18 +1,22 @@
 #!/usr/bin/lua
--- weather.lua - A lua based weather script using openweathermap 2.5 API Obtain a key at http://openweathermap.org
--- v3 2026-01-11 @rew62
+-- weather.lua - A lua based weather script using openweathermap 2.5 API. Obtain a key at http://openweathermap.org
+-- v3 02 2026-01-23 @rew62
 
 local http = require("socket.http")
 local json = require("cjson")
 
 -- CONFIGURATION
 local api_url = "http://api.openweathermap.org/data/2.5/weather?"
-local cf = "imperial"
+cf = "imperial"
 
--- Load Environment
+-- LOAD ENVIRONMENT (Silently)
 local env_path = os.getenv("HOME") .. "/.conky/rew62/.env"
-local f = loadfile(env_path) 
-if f then f() else print(".env error") end
+local f = loadfile(env_path)
+if f then pcall(f) end -- pcall runs it safely; no 'else' means no error printed
+
+if cf ~= "metric" and cf ~= "imperial" then
+    cf = "imperial"
+end
 
 -- PATHS
 local icon_path = os.getenv("HOME").."/.conky/rew62/weather-icons/"
