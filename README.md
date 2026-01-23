@@ -76,6 +76,7 @@ Install the fonts located in the `fonts` directory.
 The `.env` file requires these keys:
 - `apikey` - Your API key from openweathermap.org
 - `cityid` - Your city ID
+- `cf` - Your weather measure units (metric or imperial)
 - `lat` - Latitude (decimal format)
 - `lon` - Longitude (decimal format)
 
