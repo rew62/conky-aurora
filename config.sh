@@ -60,9 +60,9 @@ CURRENT_CITYID=${cityid:-""}
 read -p "City ID [$CURRENT_CITYID]: " INPUT
 cityid=${INPUT:-$CURRENT_CITYID}
 
-# Question 3: Celsius or Fahrenheit
+# Question 3: metric (Celsius) or imperial (Fahrenheit)
 CURRENT_CF=${cf:-""}
-read -p "Celsius or Fahrenheit (c/f) [$CURRENT_CF]: " INPUT
+read -p "metric (Celsius) or imperial (Fahrenheit) [$CURRENT_CF]: " INPUT
 cf=${INPUT:-$CURRENT_CF}
 
 # Question 4: Latitude
