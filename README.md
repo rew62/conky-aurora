@@ -34,9 +34,9 @@ The [fourmilab.ch](http://www.fourmilab.ch) site was developed by John Walker, f
 
 ### /dev/shm Usage
 
-These scripts use `/dev/shm/`, a virtual filesystem (tmpfs) that uses RAM for storing temporary files, saving wear and tear on your SSD. All Debian based systems include Ubunto, and Mint mount `/dev/shm` by default.
+Verify that `/dev/shm` is available on your system. `/dev/shm` is a virtual filesystem (tmpfs) that resides in RAM; using it for temporary files improves performance and reduces wear on your SSD. Most modern Linux distributions including Arch, Debian, and derivatives like Ubuntu and Mint—mount `/dev/shm` by default."
 
-**Check if /dev/shm is available on your system.** If not mounted in your distro, you'll need to edit the scripts to use your preferred temp directory.
+To check if it is mounted, you can run: `df -h /dev/shm`
 
 ## Installation & Setup
 
