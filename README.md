@@ -34,7 +34,7 @@ The [fourmilab.ch](http://www.fourmilab.ch) site was developed by John Walker, f
 
 ### /dev/shm Usage
 
-Verify that `/dev/shm` is available on your system. `/dev/shm` is a virtual filesystem (tmpfs) that resides in RAM; using it for temporary files improves performance and reduces wear on your SSD. Most modern Linux distributions including Arch, Debian, and derivatives like Ubuntu and Mint—mount `/dev/shm` by default."
+Verify that `/dev/shm` is available on your system. `/dev/shm` is a virtual filesystem (tmpfs) that resides in RAM; using it for temporary files improves performance and reduces wear on your SSD. Most modern Linux distributions including Arch, Debian, and derivatives like Ubuntu and Mint—mount `/dev/shm` by default.
 
 To check if it is mounted, you can run: `df -h /dev/shm`
 
@@ -112,11 +112,26 @@ crontab < earth/crontab
 - Verify installation:
       `crontab -l`
 
-### 6. Set Up gcalcli
+### 6. Set Up gcalcli (optional)
    1. Setup project for gcalcli at https://console.cloud.google.com
    2. Setup OAUTH and obtain tokens
    3. Run ```gcalcli list``` to initalize OAuth. Use the tokens you generate to authorize gcalcli.
 
+
+### 7. Run the scripts:
+```
+conky -c sidepanel/sidepanel-1.rc
+```
+or
+```
+conky -c sidepanel/sidepanel-2.rc
+```
+and the calendar
+```
+conky -c calendar/calendar.rc
+```
+
+Change `-- background = false` to `-- background = true,` in the .rc files to fork the conky's to the background or install conky manager to mange your scripts.
 
 ## License
 
