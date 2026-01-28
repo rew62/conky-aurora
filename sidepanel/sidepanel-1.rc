@@ -126,7 +126,7 @@ ${image /dev/shm/earth.png -p 35, 380 -s 140x140 -n}
 ${voffset 116}
 #----------------------- Moon -----------------------
 ${color1}${font3}MOON: --${font3}${voffset -10}
-${if_existing /dev/shm/net_error}${font Symboloa:size=8}${color red}${goto 5}● ${else}${font Symbola:size=3}${color green}${goto 15}●${endif}
+${if_existing /dev/shm/moon_script_error}${font Symbola:size=8}${color red}${goto 5}● ${else}${font Symbola:size=3}${color green}${goto 15}●${endif}
 ${voffset -26}${execpi 300 cat /dev/shm/moon-data.txt 2>/dev/null || cat $HOME/.conky/rew62/sidepanel/.cache/moon-data.bak 2>/dev/null}
 ${image /dev/shm/moon.jpg -p 20, 540 -s 65x65 -n}
 #-----------------------System Information -----------------------
