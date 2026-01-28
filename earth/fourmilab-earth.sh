@@ -9,12 +9,13 @@
 # Configuration
 NOW=$(date "+%Y-%m-%d %H:%M:%S")
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-#Save Earch.png to SCRIPT_DIR or tempfs. /dev/shm is standard on Debian based systems including Ubuntu and Linux Mint.
+#Save Earth.png to SCRIPT_DIR or tempfs. /dev/shm is standard on Debian based systems including Ubuntu and Linux Mint.
 #EARTH_IMG="$SCRIPT_DIR/earth.png"
 EARTH_IMG="/dev/shm/earth.png"
-
+BACKUP_IMG="$SCRIPT_DIR/earth_backup.png"  # Persistent Backup 
 TEMP_FILE="$EARTH_IMG.tmp"
 THRESHOLD_MINS=9 
+WGET_TIMEOUT=30  # Seconds
 
 # Multiple options available at https://www.fourmilab.ch/earthview/custom.html
 URL="https://www.fourmilab.ch/cgi-bin/Earth?img=NASAmMM-l.evif&imgsize=600&dynimg=y&gamma=1.32&opt=-s&lat=&lon=&alt=&tle=&date=0&utc=&jd="
@@ -25,26 +26,33 @@ if [ -f "$EARTH_IMG" ]; then
     CURRENT_TIME=$(date +%s)
     AGE=$((CURRENT_TIME - FILE_TIME))
     THRESHOLD_SECS=$((THRESHOLD_MINS * 60))
-
     if [ "$AGE" -lt "$THRESHOLD_SECS" ]; then
-	echo "[$NOW] Image is $((AGE / 60)) minutes old. Skipping download."
+        echo "[$NOW] Image is $((AGE / 60)) minutes old. Skipping download."
         exit 0
     fi
 fi
 
 # 2. Download and Process
-echo "Downloading and processing image..."
-if wget -qO - "$URL" | convert - -fuzz 10% -transparent black "$TEMP_FILE"; then
+echo "[$NOW] Downloading and processing image..."
+if wget --timeout="$WGET_TIMEOUT" --tries=2 -qO - "$URL" | convert - -fuzz 10% -transparent black "$TEMP_FILE"; then
     if [ -s "$TEMP_FILE" ]; then
         mv "$TEMP_FILE" "$EARTH_IMG"
-	echo "[$NOW] Success: $EARTH_IMG updated."
+        # Save a backup copy to persistent storage
+        cp "$EARTH_IMG" "$BACKUP_IMG"
+        echo "[$NOW] Success: $EARTH_IMG updated."
     else
-        echo "Error: Processed file is empty."
+        echo "[$NOW] Error: Processed file is empty. Keeping existing image."
         [ -f "$TEMP_FILE" ] && rm "$TEMP_FILE"
         exit 1
     fi
 else
-    echo "Error: Download or ImageMagick processing failed."
+    echo "[$NOW] Error: Download or ImageMagick processing failed. Keeping existing image."
     [ -f "$TEMP_FILE" ] && rm "$TEMP_FILE"
+    
+    # If no current image exists, restore from backup
+    if [ ! -f "$EARTH_IMG" ] && [ -f "$BACKUP_IMG" ]; then
+        echo "[$NOW] Restoring from backup image."
+        cp "$BACKUP_IMG" "$EARTH_IMG"
+    fi
     exit 1
 fi
