@@ -84,15 +84,11 @@ conky.config = {
 }
 
 conky.text = [[
-${font1}${color1}${goto 10}NETWORK${alignr}${color4}${gw_iface}  
-
-${voffset -10}${font2}${goto 8}${if_up ${template1}}${color1}LAN IP:${font3}${color4}$alignr${addr ${gw_iface}}
-${font2}${color1}${goto 5}WAN IP:${color4}$alignr${font3}${texeci 86400 curl -s https://api.ipify.org}
-
-${voffset -10}${color1}${goto 8}${font PizzaDude Bullets:size=10}O${font3}${voffset -3} Up: ${color4}${upspeed ${template1}} ${goto 105}${color1}${font PizzaDude Bullets:size=10}U${voffset -3}${font3} Dn: $alignr${color4}${downspeed ${template1}}
-
-${voffset 5}${goto 8}${upspeedgraph ${template1} 20,95 0000FF 00FFFF -t -l}${goto 110}${downspeedgraph ${template1} 20,90 FFFF00 FF4500 -t}$color
+${font1}${color1}${goto 10}NETWORK${alignr}${color4}${font2}${gw_iface}  
+${voffset 10}${font2}${goto 8}${if_up ${template1}}${color1}LAN IP:${font3}${color4}$alignr${addr ${gw_iface}} 
+${font2}${color1}${goto 8}WAN IP:${color4}$alignr${font3}${texeci 86400 curl -s https://api.ipify.org} 
+${voffset 10}${color1}${goto 8}${font PizzaDude Bullets:size=10}O${font3}${voffset -3} Up: ${color4}${upspeed ${template1}} ${goto 105}${color1}${font PizzaDude Bullets:size=10}U${voffset -3}${font3} Dn: $alignr${color4}${downspeed ${template1}}
+${voffset 15}${goto 8}${upspeedgraph ${template1} 20,95 0000FF 00FFFF -t -l}${goto 110}${downspeedgraph ${template1} 20,90 FFFF00 FF4500 -t}$color
 ${font2}${voffset -11}${goto 8}${color1}Total: ${color #00FFFF}${totalup ${template1}} ${goto 110}${color1}Total: ${color #FF4500}${totaldown ${template1}}
-
-${voffset -10}${color1}${goto 15}In: ${color4}${tcp_portmon 1 32767 count}${color1}   Out: ${color4}${tcp_portmon 32768 61000 count}${alignr}${color1}Total: ${color4}${tcp_portmon 1 65535 count} ${endif}
+${voffset 10}${color1}${goto 15}In: ${color4}${tcp_portmon 1 32767 count}${color1}   Out: ${color4}${tcp_portmon 32768 61000 count}${alignr}${color1}Total: ${color4}${tcp_portmon 1 65535 count} ${endif}
 ]]
