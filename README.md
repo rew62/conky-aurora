@@ -5,6 +5,8 @@
 
 # Aurora 2.0 - A Conky Scripts Collection
 
+![Screenshot](Screenshot.png)
+
 A set of Conky scripts built on Linux Mint v22.2 (Zara), and v22.3 (Zena)
 
 ## Credits
