@@ -13,7 +13,7 @@ chkfile="$TMP/lyrics.chk"
 jqfile="$TMP/lyrics.jq"
 inst_helper="$BASEDIR/instrumental_lrclib.sh"
 
-LOCAL_LYRICS_DIR="/home/bwebb/lyrics"
+LOCAL_LYRICS_DIR="$HOME/lyrics"
 
 # wget timeout (seconds) — prevents the startup hang when network is slow/unavailable
 WGET_TIMEOUT=8
