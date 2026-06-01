@@ -41,7 +41,7 @@ fi
 # 2. Download and Process
 echo "[$NOW] Downloading and processing image..."
 if wget --timeout="$WGET_TIMEOUT" --tries=2 -O - "$URL" | \
-   convert - -fuzz 10% -transparent black "$TEMP_FILE"; then
+   convert - -fuzz 10% -transparent black -strip "$TEMP_FILE"; then
     if [ -s "$TEMP_FILE" ]; then
         mv "$TEMP_FILE" "$EARTH_IMG"
         # Save a backup copy to persistent storage
