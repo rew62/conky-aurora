@@ -1,8 +1,7 @@
 #!/bin/bash
-# active-player.sh — monitors playerctl and triggers lyric fetching on song change.
-# Runs as a persistent background daemon launched by conky's lua startup hook or
-# a wrapper. Uses /dev/shm for all temp I/O to avoid disk writes.
-# v1 01 2026-03-09 @rew62
+# active-player.sh — event-driven lyric fetcher via playerctl --follow.
+# Zero polling cost; wakes only on DBus property changes (song change, play/pause).
+# v2 01 2026-05-31 @rew62
 
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"
 TMP="/dev/shm/conky-lyrics"
@@ -10,78 +9,78 @@ mkdir -p "$TMP"
 
 outfile="$TMP/lyrics.out"
 pidfile="$TMP/active-player.pid"
-
-# Write our PID so conky can confirm we're running
 echo $$ > "$pidfile"
 
 sendmsg() {
     printf '\n${color 888888}Active-player: ${color FF0000} %s' "$1" > "$outfile"
 }
 
+FMT='{{status}}|{{playerName}}|{{xesam:artist}}|{{xesam:title}}|{{xesam:album}}|{{mpris:artUrl}}|{{xesam:url}}'
+
 last_song=""
 
-# Retry loop for initial player detection — fixes the startup hang/race.
-# playerctl -l can return nothing for a few seconds after a player starts.
-wait_for_player() {
-    local retries=10
-    local delay=0.5
-    local i=0
-    while [ $i -lt $retries ]; do
-        local p
-        p=$(playerctl -l 2>/dev/null | head -n1)
-        [ -n "$p" ] && { echo "$p"; return 0; }
-        sleep "$delay"
-        (( i++ ))
-    done
-    return 1
-}
+handle_line() {
+    local line="$1"
+    local status pname artist title album art_url track_url rest
 
-while true; do
-    # Get first listed player (non-blocking after startup)
-    player=$(playerctl -l 2>/dev/null | head -n1)
-
-    if [ -z "$player" ]; then
-        # No player found — clear state and wait
-        if [ -n "$last_song" ]; then
-            > "$outfile"
-            > "$TMP/player.running"
-            last_song=""
-        fi
-        sleep 1   # Back off longer — no point polling fast when idle
-        continue
-    fi
-
-    status=$(playerctl -p "$player" status 2>/dev/null)
+    status="${line%%|*}";  rest="${line#*|}"
+    pname="${rest%%|*}";   rest="${rest#*|}"
+    artist="${rest%%|*}";  rest="${rest#*|}"
+    title="${rest%%|*}";   rest="${rest#*|}"
+    album="${rest%%|*}";   rest="${rest#*|}"
+    art_url="${rest%%|*}"; track_url="${rest#*|}"
 
     if [ "$status" = "Playing" ]; then
-        # Write player name once per change for show-lyric to consume
-        echo -n "$player" > "$TMP/player.running"
+        echo -n "$pname" > "$TMP/player.running"
 
-        # Batch all metadata in ONE playerctl call to reduce forks
-        meta=$(playerctl -p "$player" metadata --format '{{xesam:artist}}|{{xesam:title}}|{{xesam:album}}' 2>/dev/null)
-        artist="${meta%%|*}"; rest="${meta#*|}"; title="${rest%%|*}"; album="${rest#*|}"
+        # Stream split: mirrors nowplaying.lua
+        if [ -z "$artist" ] || [ "$artist" = "null" ]; then
+            if [[ "$title" == *" - "* ]]; then
+                artist="${title%% - *}"; title="${title#* - }"
+            fi
+        elif [ -z "$art_url" ]; then
+            if [[ "$title" == *" - "* ]]; then
+                local ta="${title%% - *}"
+                if [ "$ta" != "$artist" ]; then
+                    artist="$ta"; title="${title#* - }"
+                fi
+            fi
+        fi
 
-        current="$artist|$title|$album"
+        local current="$artist|$title|$album"
+        local save_flag=""
+        [[ "$track_url" == file://* ]] && save_flag="--save"
 
         if [ "$current" != "$last_song" ]; then
             last_song="$current"
-            # Clear stale lyrics immediately so previous song never bleeds through
             > "$TMP/lyrics.txt"
             > "$TMP/lyrics.out"
             rm -f "$TMP/lyrics.parsed"
             sendmsg "Fetching: $artist - $title"
-            "$BASEDIR/get-lyrics.sh" "$current"
+            "$BASEDIR/get-lyrics.sh" "$current" $save_flag
         fi
     else
-        # Paused or stopped
         if [ -n "$last_song" ]; then
             > "$outfile"
             > "$TMP/player.running"
             last_song=""
         fi
-        sleep 1
-        continue
     fi
+}
 
-    sleep 0.5
+# Bootstrap: --follow only fires on changes, so emit current state once at startup
+line=$(playerctl metadata --format "$FMT" 2>/dev/null)
+[ -n "$line" ] && handle_line "$line"
+
+# Event loop — restarts if --follow exits (all players disconnected)
+while true; do
+    while IFS= read -r line; do
+        handle_line "$line"
+    done < <(playerctl --follow --player "%any" metadata --format "$FMT" 2>/dev/null)
+
+    # --follow exited — clear state and wait for a player to appear
+    > "$outfile"
+    > "$TMP/player.running"
+    last_song=""
+    sleep 2
 done

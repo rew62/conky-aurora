@@ -55,8 +55,8 @@ if [ ! -f "$cachefile" ] || \
         /^\[[0-9]+:[0-9]/ {
             # arr[1]=min, arr[2]=sec, arr[3]=frac (with leading dot e.g. ".502"), arr[4]=text
             if (match($0, /^\[([0-9]+):([0-9]+)(\.[0-9]+)?\](.*)/, arr)) {
-                frac = (arr[3] == "") ? 0 : substr(arr[3], 2) + 0  # strip leading dot
-                t = arr[1]*60 + arr[2] + frac/1000
+                frac_str = (arr[3] == "") ? "0" : substr(arr[3], 2)
+                t = arr[1]*60 + arr[2] + frac_str / (10 ^ length(frac_str))
                 printf "%.3f\t%s\n", t, arr[4]
             }
         }

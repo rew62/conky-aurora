@@ -26,6 +26,7 @@ sendmsg() {
 
 arg1="$1"
 [ -z "$arg1" ] && exit 0
+save_lyrics="$2"   # "--save" for local files, empty for streams
 
 artist="${arg1%%|*}"; rest="${arg1#*|}"; title="${rest%%|*}"; album="${rest#*|}"
 
@@ -41,6 +42,7 @@ fi
 # Helper: save to local cache
 ###################################################################
 save_to_cache() {
+    [ "$save_lyrics" = "--save" ] || return
     [ -d "$LOCAL_LYRICS_DIR" ] || return
     local cache_file="$LOCAL_LYRICS_DIR/${artist} - ${title}.lrc"
     cp "$txtfile" "$cache_file" 2>/dev/null
