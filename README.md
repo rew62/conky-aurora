@@ -13,6 +13,7 @@ A set of Conky scripts built on Linux Mint v22.2 (Zara), and v22.3 (Zena)
 
 - **allcombined.lua** - created by mrpeachy
 - **background.lua, loadall.lua, lua3-bars.lua, and image.lua** - created by @wim66.
+- **lyrics and spectrum-equalizer scripts** - original versions by Koentje.
 - **All other scripts** - created by @rew62
 
 ▶️  **TL;DR - Run the configuation script!**
@@ -136,3 +137,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **allcombined.lua** - created by mrpeachy
 - **background.lua, loadall.lua, lua3-bars.lua, and image.lua** - created by wim66.
+- **lyrics and spectrum-equalizer scripts** - original versions by Koentje. More of Koentje's scripts can be found at: [cobrasoft.nl](https://www.cobrasoft.nl/download/conky)

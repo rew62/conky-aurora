@@ -4,7 +4,7 @@
 # Dedicated to John Walker (2024) whose website made this script possible. Your voice remains in the code.
 # 
 # Place this line in your cron with crontab -e. Edit path to script location. Use full path. 
-# */10 * * * * /home/user/.conky/rew62/earth/fourmilab-earth.sh > /dev/shm/cron_debug.log 2>&1
+# */10 * * * * /home/user/.conky/<install-dir>/earth/fourmilab-earth.sh > /dev/shm/cron_debug.log 2>&1
 
 # Configuration
 NOW=$(date "+%Y-%m-%d %H:%M:%S")

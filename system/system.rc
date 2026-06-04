@@ -85,7 +85,7 @@ conky.config = {
    
   -- Fonts (Renumbered)
   font = 'Ubuntu Mono',
-  font2 = 'JetBrains Mono:bold:size=9',
+  font2 = 'JetBrainsMono Nerd Font:bold:size=9',
   font3 = 'Fira Code:size=10',
   font4 = 'Liberation Sans:size=11',
   font5 = 'IBM Plex Mono:size=11',

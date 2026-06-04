@@ -7,7 +7,8 @@ local HOME = os.getenv("HOME")
 
 -- A helper function to build the full path to an image
 local function get_img(name)
-    local full_path = HOME .. "/.conky/rew62/sidepanel/images/" .. name
+    --local full_path = HOME .. "/.conky/rew62/sidepanel/images/" .. name
+    local full_path = script_path .. "../images/" .. name
     -- print("Looking for image at: " .. full_path) 
     return full_path
 end

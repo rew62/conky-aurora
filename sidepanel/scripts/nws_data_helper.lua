@@ -2,6 +2,7 @@ local M = {}
 
 -- Configuration
 local HOME = os.getenv("HOME")
+local script_dir = debug.getinfo(1, "S").source:sub(2):match("(.*/)") or "./"
 local update_interval = 14400 
 local last_update = 0
 local data_file = "/dev/shm/nws_data.txt"
@@ -15,7 +16,8 @@ function M.refresh()
     if now - last_update >= update_interval then
         -- Run the shell script in the BACKGROUND (&) 
         -- and redirect its output to a temp file in RAM
-        os.execute(HOME .. "/.conky/rew62/sidepanel/scripts/nws-scrape.sh > " .. data_file)
+        --os.execute(HOME .. "/.conky/rew62/sidepanel/scripts/nws-scrape.sh > " .. data_file)
+        os.execute(script_dir .. "nws-scrape.sh > " .. data_file)
         last_update = now
     end
 

@@ -41,7 +41,7 @@ conky.config = {
     color5 = '4CAF50',  -- Material Design Green
 
     -- Fonts
-    font3 = 'GoodTimes:size=12',
+    font3 = 'Good Times:size=12',
 
     -- Update settings
     update_interval = 1,

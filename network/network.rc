@@ -58,7 +58,7 @@ conky.config = {
   font8 = 'zekton:size=12',
    
   -- Templates
-  template1 = "eth0",					-- LAN interface name
+  template1 = "wlp2s0",					-- LAN interface name
 
     -- Lua Load
     lua_load = './settings.lua scripts/loadall.lua',

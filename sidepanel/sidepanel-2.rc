@@ -96,7 +96,7 @@ conky.config = {
   
   -- Fonts (Renumbered)
   font = 'Ubuntu Mono',
-  font2 = 'JetBrains Mono:bold:size=9',
+  font2 = 'JetBrainsMono Nerd Font:bold:size=9',
   font3 = 'Fira Code:size=10',
   font4 = 'Liberation Sans:size=11',
   font5 = 'IBM Plex Mono:size=11',
@@ -104,7 +104,7 @@ conky.config = {
   font7 = 'DejaVu Sans:size=11',
    
   -- Templates
-  template1 = "eth0",					-- LAN interface name
+  template1 = "wlp2s0",					-- LAN interface name
   template2 = [[${color1}\1: ${color4}]],
 
   -- Lua Scripts
@@ -124,7 +124,8 @@ ${alignc}${execpi 300 ./scripts/weather.lua}
 #----------------------- Moon -----------------------
 #${color1}${font3}MOON: --${font3}${voffset -10}
 #${if_existing /dev/shm/net_error}${font Symbola:size=8}${color red}${goto 5}● ${else}${font Symbola:size=3}${color green}${goto 15}●${endif}
-#${voffset -26}${execpi 300 cat /dev/shm/moon-data.txt 2>/dev/null || cat $HOME/.conky/rew62/sidepanel/.cache/moon-data.bak 2>/dev/null}
+##${voffset -26}${execpi 300 cat /dev/shm/moon-data.txt 2>/dev/null || cat $HOME/.conky/rew62/sidepanel/.cache/moon-data.bak 2>/dev/null}
+#${voffset -26}${execpi 300 cat /dev/shm/moon-data.txt 2>/dev/null || cat $HOME/.conky/*/sidepanel/.cache/moon-data.bak 2>/dev/null}
 #${image /dev/shm/moon.jpg -p 20, 360 -s 65x65 -n}
 #-----------------------System Information -----------------------
 ${voffset 10} \

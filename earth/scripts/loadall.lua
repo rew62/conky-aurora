@@ -16,7 +16,8 @@ local FULL_SCRIPT_DIR = io.popen("realpath '" .. debug.getinfo(1,"S").source:sub
 --print("Earth Script Running From: " .. FULL_SCRIPT_DIR)
 
 --local path = SCRIPT_DIR .. "../spectrum-configs/" .. name
-CONKY_DIR = os.getenv("HOME") .. "/.conky/rew62/earth/"
+--CONKY_DIR = os.getenv("HOME") .. "/.conky/rew62/earth/"
+CONKY_DIR = FULL_SCRIPT_DIR:match("(.*/)") or (FULL_SCRIPT_DIR .. "/")
 ------------------------------------------
 
 local function try_require(modname)

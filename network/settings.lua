@@ -7,7 +7,7 @@ package.path = "./scripts/?.lua"
 function conky_vars()
 
     -- Set network interface for all scripts here
-    var_NETWORK = "eth0"
+    var_NETWORK = "wlp2s0"
 
     use_FONT = "zekton"
     -- https://www.dafont.com/zekton.font

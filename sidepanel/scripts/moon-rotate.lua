@@ -1,7 +1,9 @@
 #!/usr/bin/env lua
 
 -- Load environment variables from .env file
-local env_path = os.getenv("HOME") .. "/.conky/rew62/.env"
+local script_dir = debug.getinfo(1, "S").source:sub(2):match("(.*/)") or "./"
+--local env_path = os.getenv("HOME") .. "/.conky/rew62/.env"
+local env_path = script_dir .. "../../.env"
 local f = loadfile(env_path)
 if f then pcall(f) end
 
