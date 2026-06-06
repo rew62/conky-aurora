@@ -43,39 +43,3 @@ done &
 ) &
 
 echo "cava-loop.sh: EQ Engine is running in the background."
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-echo "cava-loop.sh: EQ Engine is running in the background."
