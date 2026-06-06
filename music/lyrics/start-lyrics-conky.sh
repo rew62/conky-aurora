@@ -21,8 +21,7 @@ cleanup() {
     rm -f "$PIDFILE"
     exit 0
 }
-#trap cleanup INT TERM EXIT # Exit not needed if calling from music.sh
-trap cleanup INT TERM
+trap cleanup INT TERM EXIT
 
 # ── Kill any stale active-player instance ─────────────────────────────────
 if [ -f "$PIDFILE" ]; then

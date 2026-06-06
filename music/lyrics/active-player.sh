@@ -11,6 +11,9 @@ outfile="$TMP/lyrics.out"
 pidfile="$TMP/active-player.pid"
 echo $$ > "$pidfile"
 
+cleanup() { pkill -P $$ 2>/dev/null; rm -f "$pidfile"; exit 0; }
+trap cleanup INT TERM EXIT
+
 sendmsg() {
     printf '\n${color 888888}Active-player: ${color FF0000} %s' "$1" > "$outfile"
 }
