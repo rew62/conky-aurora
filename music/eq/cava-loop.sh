@@ -7,6 +7,7 @@
 log="$HOME/.xsession-errors"
 tmp_out="/dev/shm/cava-out.tmp"
 cava_conf="./cava-config"
+parent_pid="$1"  # Conky PID passed from cava-spectrum.lua via $PPID
 
 # 2. CLEANUP
 pkill -f "cava -p $cava_conf"
@@ -28,14 +29,53 @@ stdbuf -oL cava -p "$cava_conf" | while read -r line; do
     echo "$line" > "$tmp_out"
 done &
 
-# 5. LIGHTWEIGHT MONITOR
+# 5. LIGHTWEIGHT MONITOR (PID-based, robust)
 (
+    #if ! wmctrl -l | grep -q "conky-spectrum"; then  # requires wmctrl
+    #if ! pgrep -f "spectrum.conky" > /dev/null; then
+    if [ -z "$parent_pid" ]; then exit 0; fi
     while sleep 5; do
-        if ! pgrep -x "conky" > /dev/null; then
+        if ! kill -0 "$parent_pid" 2>/dev/null; then
             pkill -f "cava -p $cava_conf"
             exit 0
         fi
     done
 ) &
+
+echo "cava-loop.sh: EQ Engine is running in the background."
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 echo "cava-loop.sh: EQ Engine is running in the background."

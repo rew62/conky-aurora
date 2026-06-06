@@ -13,7 +13,7 @@ local cava_loop_started = false
 
 -- 1. START CAVA LOOP (Only once)
 if not cava_loop_started then
-    os.execute("./cava-loop.sh &")
+    os.execute("./cava-loop.sh $PPID &")
     cava_loop_started = true
 end
 

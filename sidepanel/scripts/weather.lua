@@ -11,16 +11,16 @@ local cf = "imperial"
 local USE_ONLINE = true  -- Set to false to use local SagiSan/Dovora icons
 
 -- 2. LOAD ENVIRONMENT
-local script_dir = debug.getinfo(1, "S").source:sub(2):match("(.*/)") or "./"
---local env_path = os.getenv("HOME") .. "/.conky/rew62/.env"
-local env_path = script_dir .. "../../.env"
+local _h = io.popen("readlink -f '" .. debug.getinfo(1,"S").source:sub(2) .. "' | xargs dirname | xargs dirname | xargs dirname")
+local REPO_DIR = _h:read("*l") .. "/"
+_h:close()
+local env_path = REPO_DIR .. ".env"
 local f = loadfile(env_path)
 if f then pcall(f) end
 if cf ~= "metric" and cf ~= "imperial" then cf = "imperial" end
 
 -- 3. PATHS & CACHE
---local icon_path = os.getenv("HOME").."/.conky/rew62/weather-icons/"
-local icon_path = script_dir .. "../../weather-icons/"
+local icon_path = REPO_DIR .. "weather-icons/"
 local icon_family = "SagiSan" -- Change this to "dovora" or "modern" as needed
 local icon_theme = "dark"
 local cache_path = "/dev/shm/"

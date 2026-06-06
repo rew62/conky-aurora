@@ -1,9 +1,10 @@
 #!/usr/bin/env lua
 
--- Load environment variables from .env file
-local script_dir = debug.getinfo(1, "S").source:sub(2):match("(.*/)") or "./"
---local env_path = os.getenv("HOME") .. "/.conky/rew62/.env"
-local env_path = script_dir .. "../../.env"
+-- Derive repo root from this script's absolute path (works regardless of cwd or repo name)
+local _h = io.popen("readlink -f '" .. debug.getinfo(1,"S").source:sub(2) .. "' | xargs dirname | xargs dirname | xargs dirname")
+local REPO_DIR = _h:read("*l") .. "/"
+_h:close()
+local env_path = REPO_DIR .. ".env"
 local f = loadfile(env_path)
 if f then pcall(f) end
 
