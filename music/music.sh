@@ -13,7 +13,7 @@ cd "$(dirname "$0")" || exit
 
 start() {
     setsid bash nowplaying/start.sh > /dev/null 2>&1 &
-    setsid bash eq/start.sh > /dev/null 2>&1 &
+    (cd eq && setsid conky -c eq.rc > /dev/null 2>&1 &)
     setsid bash lyrics/start-lyrics-conky.sh > /dev/null 2>&1 &
 }
 
