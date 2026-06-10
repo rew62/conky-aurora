@@ -1,7 +1,7 @@
 bars=20                              -- nr of bars must be set in cava-config!!! (needs a restart of conky)
 max=1000                      		 -- max value of bars
 cap="b"
-x=18                          		 -- First bar vertical position
+x=26                          		 -- First bar vertical position
 y=94                          		 -- Bars horizontal positions
 barspaces=6                   		 -- Spaces between bars
 angle_bar=0                   		 -- Set angle of bar (make it circular)
@@ -13,7 +13,7 @@ smooth=true                   		 -- Smooth bars
 blockspaces=4                 		 -- Space between the blocks
 blocks=7                      		 -- Nr of blocks per bar
 height=8                      		 -- Height of a block
-width=8                       		 -- Width of a block
+width=10                      		 -- Width of a block
 angle=0                       		 -- Angle of all bars
 skew_x=0                      		 -- Skew bars (can be negative number)
 skew_y=0                      		 -- Skew blocks (can be negative number)

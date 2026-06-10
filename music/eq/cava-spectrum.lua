@@ -76,49 +76,121 @@ function split(inputstr, sep)
     sep = '%s'
   end
   local t={}
-  local i=1
   for str in string.gmatch(inputstr, '([^'..sep..']+)') do
     table.insert(t, str)
   end
   return t
 end
 
--- Read settings.ini to find cavaout value (path to cava data stream out
-  path = ("./settings.ini")
-  if io.open(path, "r") == nil then
-     print(SCRIPT_NAME..": \27[31mNo "..path.." found !\27[m")
-     os.execute("killall cava-loop")
-     os.exit()
-  else
-     file = io.open(path) lines = file:lines();
-     for line in lines
-     do
+-- Colour helper at module level (used by pattern cache below)
+local function rgb_to_r_g_b(col_a)
+    return ((col_a[1] / 0x10000) % 0x100) / 255,
+           ((col_a[1] / 0x100)   % 0x100) / 255,
+           (col_a[1]              % 0x100) / 255,
+           col_a[2]
+end
+
+-- Pattern cache: keyed by parameter string, cleared on config change.
+-- Cached patterns must never be passed to cairo_pattern_destroy by callers.
+local pattern_cache = {}
+
+local function invalidate_pattern_cache()
+    for _, pat in pairs(pattern_cache) do
+        cairo_pattern_destroy(pat)
+    end
+    pattern_cache = {}
+end
+
+-- Solid RGBA pattern, cached for reuse across frames
+local function get_rgba_pat(col)
+    local key = col[1] .. "_" .. col[2]
+    if not pattern_cache[key] then
+        pattern_cache[key] = cairo_pattern_create_rgba(rgb_to_r_g_b(col))
+    end
+    return pattern_cache[key]
+end
+
+-- Smooth linear gradient, cached for reuse across frames
+local function get_smooth_linear_pat(x0, y0, x1, y1, fg_col, alarm_col, mid_col)
+    local key = string.format("sl_%.2f_%.2f_%.2f_%.2f_%x_%.3f_%x_%.3f",
+        x0, y0, x1, y1, fg_col[1], fg_col[2], alarm_col[1], alarm_col[2])
+    if mid_col then key = key .. "_m" .. #mid_col end
+    if not pattern_cache[key] then
+        local pat = cairo_pattern_create_linear(x0, y0, x1, y1)
+        cairo_pattern_add_color_stop_rgba(pat, 0, rgb_to_r_g_b(fg_col))
+        cairo_pattern_add_color_stop_rgba(pat, 1, rgb_to_r_g_b(alarm_col))
+        if mid_col then
+            for i = 1, #mid_col do
+                cairo_pattern_add_color_stop_rgba(pat, mid_col[i][1],
+                    rgb_to_r_g_b({mid_col[i][2], mid_col[i][3]}))
+            end
+        end
+        pattern_cache[key] = pat
+    end
+    return pattern_cache[key]
+end
+
+-- Smooth radial gradient, cached for reuse across frames
+local function get_smooth_radial_pat(x0, y0, r0, x1, y1, r1, fg_col, alarm_col, mid_col)
+    local key = string.format("sr_%.2f_%.2f_%.2f_%.2f_%.2f_%.2f_%x_%.3f_%x_%.3f",
+        x0, y0, r0, x1, y1, r1, fg_col[1], fg_col[2], alarm_col[1], alarm_col[2])
+    if mid_col then key = key .. "_m" .. #mid_col end
+    if not pattern_cache[key] then
+        local pat = cairo_pattern_create_radial(x0, y0, r0, x1, y1, r1)
+        cairo_pattern_add_color_stop_rgba(pat, 0, rgb_to_r_g_b(fg_col))
+        cairo_pattern_add_color_stop_rgba(pat, 1, rgb_to_r_g_b(alarm_col))
+        if mid_col then
+            for i = 1, #mid_col do
+                cairo_pattern_add_color_stop_rgba(pat, mid_col[i][1],
+                    rgb_to_r_g_b({mid_col[i][2], mid_col[i][3]}))
+            end
+        end
+        pattern_cache[key] = pat
+    end
+    return pattern_cache[key]
+end
+
+
+-- Read settings.ini to find cavaout value (path to cava data stream out)
+local settings_path = "./settings.ini"
+local settings_file = io.open(settings_path, "r")
+if settings_file == nil then
+    print(SCRIPT_NAME..": \27[31mNo "..settings_path.." found !\27[m")
+    os.execute("killall cava-loop")
+    os.exit()
+else
+    for line in settings_file:lines() do
         local key = {line}
         local mykey = split(key[1], "=")
-         if mykey[1] == "cavaout" then
-           cava_out_path = string.sub(mykey[2],2,-2)
-         end
-         if mykey[1] == "eqconfig" then
-           eq_config_path = string.sub(mykey[2],2,-2)
-         end
-         if mykey[1] == "showconfig" then
-           show_config = string.sub(mykey[2],2,-2)
-         end
-         if mykey[1] == "showlabel" then
-           show_label = string.sub(mykey[2],2,-2)
-         end
-         -- if mykey[1] == "live_edit" then
-         --   live_edit = string.sub(mykey[2],2,-2)
-         --   if live_edit==nil then live_edit="off" end
-         --   le=""
-         -- end
-     end
-  end
+        if mykey[1] == "cavaout" then
+            cava_out_path = string.sub(mykey[2],2,-2)
+        end
+        if mykey[1] == "eqconfig" then
+            eq_config_path = string.sub(mykey[2],2,-2)
+        end
+        if mykey[1] == "showconfig" then
+            show_config = string.sub(mykey[2],2,-2)
+        end
+        if mykey[1] == "showlabel" then
+            show_label = string.sub(mykey[2],2,-2)
+        end
+        -- if mykey[1] == "live_edit" then
+        --   live_edit = string.sub(mykey[2],2,-2)
+        --   if live_edit==nil then live_edit="off" end
+        --   le=""
+        -- end
+    end
+    settings_file:close()
+end
 
 -- Global config settings
 local last_config = ""
 local config_loaded = false
 local label_show_until = 0
+local update_count = 0          -- replaces conky_parse('${updates}') check
+local last_cava_values = {}     -- retained on empty reads to suppress write-race blips
+local config_check_frame = 10  -- start at 10 to force a file read on the first frame
+local last_known_config = ""   -- cached between throttled eq-config reads
 
 -- Load config index from filesystem (alphabetical, auto-includes new configs)
 local config_index = {}
@@ -160,25 +232,35 @@ function conky_main_bars(arg)
   if conky_window == nil then return "" end
 
     -- READ SELECTED CONFIG FROM RAM (arg overrides, e.g. ${lua main_bars blocks})
-    local config = arg or config_index[1] or ""
+    -- Throttled: eq-config file is only re-read every 10 frames (~600ms) since it
+    -- only changes on mouse click. last_known_config holds the value between reads.
+    local config = arg or last_known_config
     if not arg then
-        local sel_file = io.open(eq_config_path, "r")
-        if sel_file then
-            local num = tonumber(sel_file:read("*l"))
-            sel_file:close()
-            if num and config_index[num] then config = config_index[num] end
+        config_check_frame = config_check_frame + 1
+        if config_check_frame >= 10 then
+            config_check_frame = 0
+            local sel_file = io.open(eq_config_path, "r")
+            if sel_file then
+                local num = tonumber(sel_file:read("*l"))
+                sel_file:close()
+                if num and config_index[num] then
+                    last_known_config = config_index[num]
+                    config = last_known_config
+                end
+            end
         end
     end
+    if config == "" then config = config_index[1] or "" end
 
     -- CONFIG OUTPUT TO STDOUT
     if show_config == "on" and config ~= "" then
-      local path = "./spectrum-configs/" .. config
-      local f = io.open(path, "r")
+      local cfg_path = "./spectrum-configs/" .. config
+      local f = io.open(cfg_path, "r")
       if f ~= nil then
         f:close()
         print("Loading spectrum config: \27[32m" .. config .."\27[m")
         print("__________________________________\n")
-        os.execute("cat ".. path .." | awk -F'--' '{print $1}' | awk -F'=' '{print \"\27[97;3m\" $1 \"\27[31m=\27[32m\" $2 \"\27[m\" }'")
+        os.execute("cat ".. cfg_path .." | awk -F'--' '{print $1}' | awk -F'=' '{print \"\27[97;3m\" $1 \"\27[31m=\27[32m\" $2 \"\27[m\" }'")
         print("__________________________________\n")
         show_config = "off"
       end
@@ -187,32 +269,35 @@ function conky_main_bars(arg)
 
     -- LOAD EXTERNAL CONFIG (Only once per session/name change)
     if not config_loaded or last_config ~= config then
-        local path = "./spectrum-configs/" .. config
-        if io.open(path, "r") then
-            local chunk = loadfile(path)
-            if chunk then
-                chunk() -- Executes config and sets global variables
-                last_config = config
-                label_show_until = os.time() + 5
-                -- if live_edit == "on" then le="(\27[31;5mLIVE EDIT\27[m)" else
-                config_loaded = true
-                -- end
-                print(SCRIPT_NAME..": \27[32m" .. config .. "\27[m")
-            end
+        local cfg_path = "./spectrum-configs/" .. config
+        local chunk = loadfile(cfg_path)  -- returns nil if file missing
+        if chunk then
+            chunk() -- Executes config and sets global variables
+            invalidate_pattern_cache()  -- colors/dimensions changed; rebuild on next draw
+            last_config = config
+            label_show_until = os.time() + 5
+            -- if live_edit == "on" then le="(\27[31;5mLIVE EDIT\27[m)" else
+            config_loaded = true
+            -- end
+            print(SCRIPT_NAME..": \27[32m" .. config .. "\27[m")
         end
     end
 
 
    -- READ CAVA DATA (The high-speed optimization)
-   local cava_values = {}
+   -- On an empty read (shell truncated file before finishing write), retain the
+   -- previous frame's values to avoid a one-frame drop-to-zero blip.
+   local cava_values = last_cava_values
    local cava_file = io.open(cava_out_path, "r")
    if cava_file then
        local line = cava_file:read("*l")
        cava_file:close()
-       if line then
+       if line and line ~= "" then
+           cava_values = {}
            for val in string.gmatch(line, "%S+") do
              table.insert(cava_values, tonumber(val) or 0)
            end
+           last_cava_values = cava_values
        end
    end
 
@@ -223,7 +308,8 @@ function conky_main_bars(arg)
 
 
    -- RENDER BAR LOOP
-   if tonumber(conky_parse('${updates}')) > 3 then
+   update_count = update_count + 1
+   if update_count > 3 then
       for i = 1, (bars or 0) do
           local k = {
                      value = cava_values[i] or 0,
@@ -252,7 +338,7 @@ function conky_main_bars(arg)
                      reflection_scale = reflection_scale or 1,
                      alarm = alarm,
                     }
-          draw_multi_bar_graph(k, cr)
+          draw_multi_bar_graph(k)
       end
    end
 
@@ -285,51 +371,41 @@ end
 function draw_multi_bar_graph(t)
   cairo_save(cr)
 
+  -- shared upvalues for nested functions (were previously implicit globals)
+  local delta, pct, pcb, circle, cblock
+
   --check values
   if t.max==nil then
     print ("No maximum value defined, use 'max'")
     return
   end
 
-   --set default values
-   if t.x == nil     then t.x = conky_window.width/2 end
-   if t.y == nil     then t.y = conky_window.height/2 end
-   if t.blocks == nil    then t.blocks=10 end
-   if t.height == nil    then t.height=10 end
-   if t.angle == nil     then t.angle=0 end
-   if t.mode == nil      then t.mode="straight" end
+   -- Defaults for fields not guaranteed by conky_main_bars (colours, alarm, smooth, mode)
+   -- Numeric/structural fields (blocks, height, width, etc.) are pre-filled with 'or'
+   -- defaults in the k table, so their nil-checks are omitted here.
+   if t.mode == nil then t.mode="straight" end
    if t.mode == "round" then
      circle = 360/bars
      cblock = circle/blocks
    end
-   t.angle = t.angle*math.pi/180
+   t.angle    = t.angle    * math.pi / 180
+   t.angle_bar = t.angle_bar * math.pi / 360  -- half angle
+   t.skew_x   = math.pi * t.skew_x / 180
+   t.skew_y   = math.pi * t.skew_y / 180
 
    --line cap style
-   if t.cap==nil     then t.cap = "b" end
-   local cap="b"
+   local cap = "b"
    for i,v in ipairs({"s","r","b"}) do
      if v==t.cap then cap=v end
    end
-   delta=0
+   delta = 0
    if t.cap=="r" or t.cap=="s" then delta = t.height end
-   if cap=="s" then  cap = CAIRO_LINE_CAP_SQUARE
-   elseif cap=="r" then
-     cap = CAIRO_LINE_CAP_ROUND
-   elseif cap=="b" then
-     cap = CAIRO_LINE_CAP_BUTT
+   if cap=="s" then      cap = CAIRO_LINE_CAP_SQUARE
+   elseif cap=="r" then  cap = CAIRO_LINE_CAP_ROUND
+   else                  cap = CAIRO_LINE_CAP_BUTT
    end
-   --end line cap style
 
-   --if t.led_effect == nil  then t.led_effect="r" end
-   if t.width == nil then t.width=20 end
-   if t.blockspaces == nil   then t.blockspaces=2 end
-   if t.barspaces == nil then t.barspaces=2 end
-   if t.radius == nil    then t.radius=0 end
-
-   if t.angle_bar == nil then t.angle_bar=0 end
-   t.angle_bar = t.angle_bar*math.pi/360 --halt angle
-
-   --colours
+   --colours (passed directly from config globals; may be nil if config omits them)
    if t.bg_colour == nil     then t.bg_colour = {0x00FF00,0.5} end
    if #t.bg_colour ~=2       then t.bg_colour = {0x00FF00,0.5} end
    if t.fg_colour == nil     then t.fg_colour = {0x00FF00,1} end
@@ -346,98 +422,51 @@ function draw_multi_bar_graph(t)
      end
    end
 
-   if t.bg_led ~= nil and #t.bg_led ~=2  then t.bg_led = t.bg_colour end
-   if t.fg_led ~= nil and #t.fg_led ~=2  then t.fg_led = t.fg_colour end
-   if t.alarm_led~= nil and #t.alarm_led~=2 then t.alarm_led = t.fg_led end
+   if t.bg_led ~= nil and #t.bg_led ~=2     then t.bg_led = t.bg_colour end
+   if t.fg_led ~= nil and #t.fg_led ~=2     then t.fg_led = t.fg_colour end
+   if t.alarm_led ~= nil and #t.alarm_led~=2 then t.alarm_led = t.fg_led end
 
-   if t.alarm == nil then t.alarm = t.max end --0.8*t.max end
-   if t.smooth == nil then t.smooth = false end
-
-   if t.skew_x == nil then
-     t.skew_x=0
-   else
-     t.skew_x = math.pi*t.skew_x/180
-   end
-   if t.skew_y == nil then
-     t.skew_y=0
-   else
-     t.skew_y = math.pi*t.skew_y/180
-   end
-
-   if t.reflection_alpha==nil then t.reflection_alpha=0 end
-   if t.reflection_length==nil then t.reflection_length=1 end
-   if t.reflection_scale==nil then t.reflection_scale=1 end
-  --end of default values
+   if t.alarm  == nil then t.alarm  = t.max  end
+   if t.smooth == nil then t.smooth = false  end
 
 
-
-  local function rgb_to_r_g_b(col_a)
-    return ((col_a[1] / 0x10000) % 0x100) / 255., ((col_a[1] / 0x100) % 0x100) / 255., (col_a[1] % 0x100) / 255., col_a[2]
-  end
-
-
-  --functions used to create patterns
-  local function create_smooth_linear_gradient(x0,y0,x1,y1)
-    local pat = cairo_pattern_create_linear (x0,y0,x1,y1)
-    cairo_pattern_add_color_stop_rgba (pat, 0, rgb_to_r_g_b(t.fg_colour))
-    cairo_pattern_add_color_stop_rgba (pat, 1, rgb_to_r_g_b(t.alarm_colour))
-    if t.mid_colour ~=nil then
-      for i=1, #t.mid_colour do
-        cairo_pattern_add_color_stop_rgba (pat, t.mid_colour[i][1], rgb_to_r_g_b({t.mid_colour[i][2],t.mid_colour[i][3]}))
-      end
-    end
-    return pat
-  end
-
-  local function create_smooth_radial_gradient(x0,y0,r0,x1,y1,r1)
-    local pat =  cairo_pattern_create_radial (x0,y0,r0,x1,y1,r1)
-    cairo_pattern_add_color_stop_rgba (pat, 0, rgb_to_r_g_b(t.fg_colour))
-    cairo_pattern_add_color_stop_rgba (pat, 1, rgb_to_r_g_b(t.alarm_colour))
-    if t.mid_colour ~=nil then
-      for i=1, #t.mid_colour do
-        cairo_pattern_add_color_stop_rgba (pat, t.mid_colour[i][1], rgb_to_r_g_b({t.mid_colour[i][2],t.mid_colour[i][3]}))
-      end
-    end
-    return pat
-  end
-
+  -- LED pattern helpers: position-dependent, not suitable for caching
   local function create_led_linear_gradient(x0,y0,x1,y1,col_alp,col_led)
-    local pat = cairo_pattern_create_linear (x0,y0,x1,y1) ---delta, 0,delta+ t.width,0)
-    cairo_pattern_add_color_stop_rgba (pat, 0.0, rgb_to_r_g_b(col_alp))
-    cairo_pattern_add_color_stop_rgba (pat, 0.5, rgb_to_r_g_b(col_led))
-    cairo_pattern_add_color_stop_rgba (pat, 1.0, rgb_to_r_g_b(col_alp))
+    local pat = cairo_pattern_create_linear(x0,y0,x1,y1)
+    cairo_pattern_add_color_stop_rgba(pat, 0.0, rgb_to_r_g_b(col_alp))
+    cairo_pattern_add_color_stop_rgba(pat, 0.5, rgb_to_r_g_b(col_led))
+    cairo_pattern_add_color_stop_rgba(pat, 1.0, rgb_to_r_g_b(col_alp))
     return pat
   end
 
   local function create_led_radial_gradient(x0,y0,r0,x1,y1,r1,col_alp,col_led,mode)
-    local pat = cairo_pattern_create_radial (x0,y0,r0,x1,y1,r1)
+    local pat = cairo_pattern_create_radial(x0,y0,r0,x1,y1,r1)
     if mode==3 then
-      cairo_pattern_add_color_stop_rgba (pat, 0, rgb_to_r_g_b(col_alp))
-      cairo_pattern_add_color_stop_rgba (pat, 0.5, rgb_to_r_g_b(col_led))
-      cairo_pattern_add_color_stop_rgba (pat, 1, rgb_to_r_g_b(col_alp))
+      cairo_pattern_add_color_stop_rgba(pat, 0,   rgb_to_r_g_b(col_alp))
+      cairo_pattern_add_color_stop_rgba(pat, 0.5, rgb_to_r_g_b(col_led))
+      cairo_pattern_add_color_stop_rgba(pat, 1,   rgb_to_r_g_b(col_alp))
     else
-      cairo_pattern_add_color_stop_rgba (pat, 0, rgb_to_r_g_b(col_led))
-      cairo_pattern_add_color_stop_rgba (pat, 1, rgb_to_r_g_b(col_alp))
+      cairo_pattern_add_color_stop_rgba(pat, 0, rgb_to_r_g_b(col_led))
+      cairo_pattern_add_color_stop_rgba(pat, 1, rgb_to_r_g_b(col_alp))
     end
     return pat
   end
 
 
-
   local function draw_single_bar()
-    --this fucntion is used for bars with a single block (blocks=1) but
+    --this function is used for bars with a single block (blocks=1) but
     --the drawing is cut in 3 blocks : value/alarm/background
-    --not zvzimzblr for circular bar
+    --not available for circular bar
     local function create_pattern(col_alp,col_led,bg)
-      local pat
       if not t.smooth then
         if bg then
-          pat = cairo_pattern_create_rgba  (rgb_to_r_g_b(t.bg_colour))
+          return get_rgba_pat(t.bg_colour)
         else
-          pat = create_smooth_linear_gradient(t.width/2, 0, t.width/2,-t.height)
+          return get_smooth_linear_pat(t.width/2, 0, t.width/2, -t.height,
+              t.fg_colour, t.alarm_colour, t.mid_colour)
         end
       end
-      return pat
+      return nil
     end
 
     local y1=-t.height*pct/100
@@ -451,12 +480,13 @@ function draw_multi_bar_graph(t)
     if t.angle_bar==0 then
 
       --block for fg value
-      pat = create_pattern(t.fg_colour,t.fg_led,false)
+      local pat = create_pattern(t.fg_colour,t.fg_led,false)
       cairo_set_source(cr,pat)
       cairo_rectangle(cr,0,0,t.width,y1)
       cairo_fill(cr)
 
       -- block for alarm value
+      local y3
       if not t.smooth and y2 ~=nil then
         pat = create_pattern(t.alarm_colour,t.alarm_led,false)
         cairo_set_source(cr,pat)
@@ -466,11 +496,10 @@ function draw_multi_bar_graph(t)
       else
         y2,y3=y1,y1
       end
-      -- block for bg value
+      -- block for bg value (all patterns above are cached; no destroy needed)
       cairo_rectangle(cr,0,y2,t.width,-t.height-y3)
       pat = create_pattern(t.bg_colour,t.bg_led,true)
       cairo_set_source(cr,pat)
-      cairo_pattern_destroy(pat)
       cairo_fill(cr)
     end
   end  --end single bar
@@ -478,17 +507,51 @@ function draw_multi_bar_graph(t)
 
 
   local function draw_multi_bar()
-    --function used for bars with 2 or more blocks
+
+    -- FAST PATH: solid color, straight bars
+    -- Batch all blocks of each color group into one path+stroke instead of one per block.
+    -- Reduces Cairo stroke calls from (bars*blocks) down to at most (bars*3) per frame.
+    if t.angle_bar==0 and not t.smooth and not t.led_effect then
+      local bg_pts, fg_pts, alarm_pts = {}, {}, {}
+      for pt = 1, t.blocks do
+        local y1 = -(pt-1)*(t.height+t.blockspaces)
+        if (pct>=(100/t.blocks) or pct>0) and pct>=(pcb*(pt-1)) then
+          if pct>=(100*t.alarm/t.max) and (pcb*pt)>(100*t.alarm/t.max) then
+            alarm_pts[#alarm_pts+1] = y1
+          else
+            fg_pts[#fg_pts+1] = y1
+          end
+        else
+          bg_pts[#bg_pts+1] = y1
+        end
+      end
+
+      local function stroke_group(pts, col)
+        if #pts == 0 or col[2] == 0 then return end
+        cairo_set_source(cr, get_rgba_pat(col))
+        for _, y1 in ipairs(pts) do
+          cairo_move_to(cr, 0, y1)
+          cairo_line_to(cr, t.width, y1)
+        end
+        cairo_stroke(cr)
+      end
+
+      stroke_group(bg_pts,    t.bg_colour)
+      stroke_group(fg_pts,    t.fg_colour)
+      stroke_group(alarm_pts, t.alarm_colour)
+      return
+    end
+
+    -- GENERAL PATH: per-block rendering for smooth, LED effects, and circular bars.
+    -- 'owned' tracks whether we must destroy the pattern after use (cached patterns must not be destroyed).
     for pt = 1,t.blocks do
-      --set block y
       local y1 = -(pt-1)*(t.height+t.blockspaces)
       local light_on=false
 
-      --set colors
       local col_alp = t.bg_colour
       local col_led = t.bg_led
-      if pct>=(100/t.blocks) or pct>0 then --ligth on or not the block
-        if pct>=(pcb*(pt-1))  then
+      if pct>=(100/t.blocks) or pct>0 then
+        if pct>=(pcb*(pt-1)) then
           light_on = true
           col_alp = t.fg_colour
           col_led = t.fg_led
@@ -499,54 +562,65 @@ function draw_multi_bar_graph(t)
         end
       end
 
-      --set colors
-      --have to try to create gradients outside the loop ?
+      -- skip fully transparent blocks (e.g. bg_colour alpha=0 configs like fade/flames)
+      if col_alp[2] == 0 then goto continue end
+
       local pat
+      local owned = true  -- must we cairo_pattern_destroy after use?
 
       if not t.smooth then
         if t.angle_bar==0 then
           if t.led_effect=="e" then
-            pat = create_led_linear_gradient (-delta, 0,delta+ t.width,0,col_alp,col_led)
+            pat = create_led_linear_gradient(-delta, 0, delta+t.width, 0, col_alp, col_led)
           elseif t.led_effect=="a" then
-            pat = create_led_linear_gradient (t.width/2, -t.height/2+y1,t.width/2,0+t.height/2+y1,col_alp,col_led)
-          elseif  t.led_effect=="r" then
-            pat = create_led_radial_gradient (t.width/2, y1, 0, t.width/2,y1,t.width/1.5,col_alp,col_led,2)
+            pat = create_led_linear_gradient(t.width/2, -t.height/2+y1, t.width/2, t.height/2+y1, col_alp, col_led)
+          elseif t.led_effect=="r" then
+            pat = create_led_radial_gradient(t.width/2, y1, 0, t.width/2, y1, t.width/1.5, col_alp, col_led, 2)
           else
-            pat = cairo_pattern_create_rgba  (rgb_to_r_g_b(col_alp))
+            pat = get_rgba_pat(col_alp)
+            owned = false
           end
         else
-           if t.led_effect=="a"  then
-             pat = create_led_radial_gradient (0, 0, t.radius+(t.height+t.blockspaces)*(pt-1), 0, 0, t.radius+(t.height+t.blockspaces)*(pt), col_alp,col_led,3)
+          if t.led_effect=="a" then
+            pat = create_led_radial_gradient(0, 0, t.radius+(t.height+t.blockspaces)*(pt-1), 0, 0, t.radius+(t.height+t.blockspaces)*(pt), col_alp, col_led, 3)
           else
-            pat = cairo_pattern_create_rgba  (rgb_to_r_g_b(col_alp))
+            pat = get_rgba_pat(col_alp)
+            owned = false
           end
         end
       else
-
+        -- Smooth: gradient created once per unique parameter set and cached across frames
         if light_on then
           if t.angle_bar==0 then
-            pat = create_smooth_linear_gradient(t.width/2, t.height/2, t.width/2,-(t.blocks-0.5)*(t.height+t.blockspaces))
+            pat = get_smooth_linear_pat(t.width/2, t.height/2, t.width/2,
+                -(t.blocks-0.5)*(t.height+t.blockspaces),
+                t.fg_colour, t.alarm_colour, t.mid_colour)
           else
-            pat = create_smooth_radial_gradient(0, 0, (t.height+t.blockspaces),  0,0,(t.blocks+1)*(t.height+t.blockspaces),2)
+            pat = get_smooth_radial_pat(0, 0, (t.height+t.blockspaces),
+                0, 0, (t.blocks+1)*(t.height+t.blockspaces),
+                t.fg_colour, t.alarm_colour, t.mid_colour)
           end
         else
-          pat = cairo_pattern_create_rgba  (rgb_to_r_g_b(t.bg_colour))
+          pat = get_rgba_pat(t.bg_colour)
         end
+        owned = false
       end
-      cairo_set_source (cr, pat)
-      cairo_pattern_destroy(pat)
+
+      cairo_set_source(cr, pat)
+      if owned then cairo_pattern_destroy(pat) end
 
       --draw a block
       if t.angle_bar==0 then
         cairo_move_to(cr,0,y1)
         cairo_line_to(cr,t.width,y1)
       else
-        cairo_arc( cr,0,0,
+        cairo_arc(cr, 0, 0,
           t.radius+(t.height+t.blockspaces)*(pt)-t.height/2,
-           -t.angle_bar -math.pi/2 ,
+          -t.angle_bar -math.pi/2,
            t.angle_bar -math.pi/2)
       end
       cairo_stroke(cr)
+      ::continue::
     end
   end
 
@@ -581,7 +655,7 @@ function draw_multi_bar_graph(t)
       local pat2
       local matrix1 = cairo_matrix_t:create()
       if t.angle_bar==0 then
-        pts={-delta/2,(t.height+t.blockspaces)/2,t.width+delta,-(t.height+t.blockspaces)*(t.blocks)}
+        local pts={-delta/2,(t.height+t.blockspaces)/2,t.width+delta,-(t.height+t.blockspaces)*(t.blocks)}
         if t.reflection=="t" then
           cairo_matrix_init (matrix1,1,0,0,-t.reflection_scale,0,-(t.height+t.blockspaces)*(t.blocks-0.5)*2*(t.reflection_scale+1)/2)
           pat2 = cairo_pattern_create_linear (t.width/2,-(t.height+t.blockspaces)*(t.blocks),t.width/2,(t.height+t.blockspaces)/2)
@@ -595,29 +669,27 @@ function draw_multi_bar_graph(t)
           cairo_matrix_init (matrix1,1,0,0,-1*t.reflection_scale,0,(t.height+t.blockspaces)*(t.reflection_scale+1)/2)
           pat2 = cairo_pattern_create_linear (t.width/2,(t.height+t.blockspaces)/2,t.width/2,-(t.height+t.blockspaces)*(t.blocks))
         end
-      end
-      cairo_transform(cr,matrix1)
 
-      if t.blocks==1 and t.angle_bar==0 then
-        draw_single_bar()
-        cairo_translate(cr,0,-t.height/2)
-      else
-        draw_multi_bar()
-      end
+        cairo_transform(cr,matrix1)
 
-      cairo_set_line_width(cr,0.01)
-      cairo_pattern_add_color_stop_rgba (pat2, 0,0,0,0,1-t.reflection_alpha)
-      cairo_pattern_add_color_stop_rgba (pat2, t.reflection_length,0,0,0,1)
-      if t.angle_bar==0 then
+        if t.blocks==1 and t.angle_bar==0 then
+          draw_single_bar()
+          cairo_translate(cr,0,-t.height/2)
+        else
+          draw_multi_bar()
+        end
+
+        cairo_set_line_width(cr,0.01)
+        cairo_pattern_add_color_stop_rgba (pat2, 0,0,0,0,1-t.reflection_alpha)
+        cairo_pattern_add_color_stop_rgba (pat2, t.reflection_length,0,0,0,1)
         cairo_rectangle(cr,pts[1],pts[2],pts[3],pts[4])
+        cairo_clip_preserve(cr)
+        cairo_set_operator(cr,CAIRO_OPERATOR_CLEAR)
+        cairo_stroke(cr)
+        cairo_mask(cr,pat2)
+        cairo_pattern_destroy(pat2)
+        cairo_set_operator(cr,CAIRO_OPERATOR_OVER)
       end
-      cairo_clip_preserve(cr)
-      cairo_set_operator(cr,CAIRO_OPERATOR_CLEAR)
-      cairo_stroke(cr)
-      cairo_mask(cr,pat2)
-      cairo_pattern_destroy(pat2)
-      cairo_set_operator(cr,CAIRO_OPERATOR_OVER)
-
     end --reflection
 
 

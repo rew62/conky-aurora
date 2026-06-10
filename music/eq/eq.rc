@@ -14,7 +14,7 @@ conky.config = {
 	alignment = 'br',
 	gap_x = 20,
 	gap_y = 20,
-	minimum_width = 305,
+	minimum_width = 340,
 	minimum_height = 100,
 	draw_borders = false,
 	draw_outline = false,
@@ -63,6 +63,7 @@ ${lua main_bars}
 #               half-bubbles
 #               rings
 #               rings-small
+#               rew62
 #               skewed1
 #               skewed2
 #               skewed-transparent
