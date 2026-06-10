@@ -128,7 +128,7 @@ ${voffset 116}
 ${color1}${font3}MOON: --${font3}${voffset -10}
 ${if_existing /dev/shm/moon_script_error}${font Symbola:size=8}${color red}${goto 5}● ${else}${font Symbola:size=3}${color green}${goto 15}●${endif}
 ${voffset -26}${execpi 300 cat /dev/shm/moon-data.txt 2>/dev/null || cat $HOME/.conky/*/sidepanel/.cache/moon-data.bak 2>/dev/null}
-${image /dev/shm/moon_rotated.png -p 20, 540 -s 65x65 -n}
+${if_existing /dev/shm/moon_rotated.png}${image /dev/shm/moon_rotated.png -p 20, 540 -s 65x65 -n}${endif}
 #-----------------------System Information -----------------------
 ${voffset -20}${color1}${font3}SYSTEM: ${voffset -5} ____  ${voffset 5}$alignr${color #86BE43}${font Hack Nerd Font:size=11}󰣭 ${voffset -2}${font3}${color4}${execi 86400 lsb_release -ds}${color3}
 ${template2 Uptime}$alignr$uptime_short

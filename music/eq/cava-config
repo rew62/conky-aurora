@@ -1,12 +1,11 @@
-# Main Cava Config
 
 [general]
 #
 # Changing the nrs of bars must also be changed in the LUA script! (needs a restart)
-bars = 24
+bars = 20
 
 # Lower cutoff frequency (bass)
-lower_cutoff_freq = 40
+lower_cutoff_freq = 50
 
 # Higher cutoff frequency (treble)
 higher_cutoff_freq = 10000
@@ -27,7 +26,7 @@ autosens = 1
 #
 # Noice reduction (0-100)  lower = fast but less smooth
 #                          higher= slow but smooth
-noise_reduction = 20
+noise_reduction = 30
 
 
 

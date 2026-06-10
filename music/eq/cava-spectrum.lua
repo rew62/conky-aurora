@@ -1,145 +1,632 @@
---[[ 
-    Cava Audio Visualizer for Conky - OPTIMIZED
-    v1 01 2026-03-09 @rew62
-    Full support for reflections, gradients, and custom block styling.
+
+--[[ BARGRAPH WIDGET
+    Originally written by v2.0 by wlourf (12.07.2010)
+    this widget draws a bargraph with differe,ts effects
+    http://u-scripts.blogspot.com/2010/07/bargraph-widget.html
+    Rewritten by Koentje and Bleys for use with cava as Spectrum Equalizer in conky (03.11.2023)
+    Edited by @rew62 to add mouse click events, print config name in lua (2026-06-10)
+
+Parameters are :
+3 parameters are mandatory
+name    - the name of the conky variable to display, for example for {$cpu cpu0}, just write name="cpu"
+arg     - the argument of the above variable, for example for {$cpu cpu0}, just write arg="cpu0"
+          arg can be a numericla value if name=""
+max     - the maximum value the above variable can reach, for example for {$cpu cpu0}, just write  max=100
+
+Optional parameters:
+bars        - How many bars are shown
+barspaces   - Space between bars, default=2 pixels
+x,y         - coordinates of the starting point of the first bar, default = middle of the conky window
+cap         - end of cap line, possibles values are r,b,s (for round, butt, square), default="b"
+              http://www.cairographics.org/samples/set_line_cap/
+angle       - angle of rotation of the bar in degress, default = 0 (i.e. a vertical bar)
+              set to 90 for an horizontal bar
+skew_x      - skew bar around x axis, dfaut = 0
+skew_y      - skew bar around y axis, dfaut = 0
+blocks      - number of blocks to display for a bar (values >0) , default= 10
+height      - height of a block, default=10 pixels
+width       - width of a block, default=20 pixels
+blockspaces - space between 2 blocks, default=2 pixels
+angle_bar   - this angle is used to draw a bar on a circular way (ok, this is no more a bar !) default=0
+radius      - for cicular bars, internal radius, default=0
+              with radius, parameter width has no more effect.
+
+Colours below are defined into braces {colour in hexadecimal, alpha}
+fg_colour   - colour of a block ON, default= {0x00FF00,1}
+bg_colour   - colour of a block OFF, défaut = {width=500x00FF00,0.5}
+alarm       - threshold, values after this threshold will use alarm_colour colour , default=max
+alarm_colour- colour of a block greater than alarm, default=fg_colour
+smooth      - (true or false), create a gradient from fg_colour to bg_colour, default=false
+mid_colour  - colours to add to gradient, with this syntax {position into the gradient (0 to1), colour hexa, alpha}
+              for example, this table {{0.25,0xff0000,1},{0.5,0x00ff00,1},{0.75,0x0000ff,1}} will add
+              3 colurs to gradient created by fg_colour and alarm_colour, default=no mid_colour
+fg_led      - middle colour of a block ON, default = fg_colour
+bg_led      - middle colour of a block OFF, default = bg_colour
+alarm_led   - middle colour of a block > ALARM,  default = alarm_colour
+
+reflection parameters, not avaimable for circular bars
+reflection_alpha    - add a reflection effect (values from 0 to 1) default = 0 = no reflection
+                      other values = starting opacity
+reflection_scale    - scale of the reflection (default = 1 = height of text)
+reflection_length   - length of reflection, define where the opacity will be set to zero
+                      calues from 0 to 1, default =1
+reflection          - position of reflection, relative to a vertical bar, default="b"
+                      possibles values are : "b","t","l","r" for bottom, top, left, right
+
+v1.1 (13 Feb. 2010)  numeric values can be passed instead conky stats with parameters name="", arg = numeric_value
+v1.3 (03 March 2010) added parameters radius & angle_bar to draw the bar in a circular way
+v2.0 (12 Jul. 2010)  rewrite script + add reflection effects and parameters are now set into tables
+-- Rewrite --
+V3.0 (3 Nov. 2023)   Rewrite script for use with cava as Spectrum Equalizer in conky. (Koentje & Bleys)
+V3.1 (31 dec 2025)   Fixed huge memory leak and cpu usage!! (Koentje)
+v3.2 (07 jun 2026)   Rewrote script, uses way less cpu usage on reading cava data stream  (Koentje)
+
 ]]
+
 
 require 'cairo'
 
--- Global State Variables
+
+-- Scriptname
+local SCRIPT_NAME = string.gsub(string.match(debug.getinfo(1, 'S').short_src, "[^/]+$"), '.lua', '')
+
+-- HELPER: Split line with seperator
+function split(inputstr, sep)
+  if sep == nil then
+    sep = '%s'
+  end
+  local t={}
+  local i=1
+  for str in string.gmatch(inputstr, '([^'..sep..']+)') do
+    table.insert(t, str)
+  end
+  return t
+end
+
+-- Read settings.ini to find cavaout value (path to cava data stream out
+  path = ("./settings.ini")
+  if io.open(path, "r") == nil then
+     print(SCRIPT_NAME..": \27[31mNo "..path.." found !\27[m")
+     os.execute("killall cava-loop")
+     os.exit()
+  else
+     file = io.open(path) lines = file:lines();
+     for line in lines
+     do
+        local key = {line}
+        local mykey = split(key[1], "=")
+         if mykey[1] == "cavaout" then
+           cava_out_path = string.sub(mykey[2],2,-2)
+         end
+         if mykey[1] == "eqconfig" then
+           eq_config_path = string.sub(mykey[2],2,-2)
+         end
+         if mykey[1] == "showconfig" then
+           show_config = string.sub(mykey[2],2,-2)
+         end
+         if mykey[1] == "showlabel" then
+           show_label = string.sub(mykey[2],2,-2)
+         end
+         -- if mykey[1] == "live_edit" then
+         --   live_edit = string.sub(mykey[2],2,-2)
+         --   if live_edit==nil then live_edit="off" end
+         --   le=""
+         -- end
+     end
+  end
+
+-- Global config settings
 local last_config = ""
 local config_loaded = false
-local cava_loop_started = false
+local label_show_until = 0
 
--- 1. START CAVA LOOP (Only once)
-if not cava_loop_started then
-    os.execute("./cava-loop.sh $PPID &")
-    cava_loop_started = true
+-- Load config index from filesystem (alphabetical, auto-includes new configs)
+local config_index = {}
+local handle = io.popen("ls -1 ./spectrum-configs")
+for line in handle:lines() do
+    if line ~= "index" then table.insert(config_index, line) end
+end
+handle:close()
+print(SCRIPT_NAME..": Available configs:")
+for i, name in ipairs(config_index) do
+    print(string.format("  \27[33m%2d\27[m  %s", i, name))
 end
 
--- HELPER: Convert Hex to RGBA
-local function rgb_to_r_g_b(col_a)
-    if col_a == nil then return 0, 1, 0, 1 end -- Default Green if nil
-    return ((col_a[1] / 0x10000) % 0x100) / 255., ((col_a[1] / 0x100) % 0x100) / 255., (col_a[1] % 0x100) / 255., col_a[2]
+
+-- Mouse click handler: left=next, right=prev (requires own_window_type = 'normal' if 'desktop' passes through)
+function conky_mouse_hook(event)
+    if event.type ~= "button_down" then return false end
+    local total = #config_index
+    if total == 0 then return false end
+    local current = 1
+    local f = io.open(eq_config_path, "r")
+    if f then current = tonumber(f:read("*l")) or 1; f:close() end
+    if event.button == "left" then       -- left click: next
+        current = (current % total) + 1
+    elseif event.button == "right" then  -- right click: prev
+        current = ((current - 2) % total) + 1
+    else
+        return false
+    end
+    local out = io.open(eq_config_path, "w")
+    if out then out:write(current); out:close() end
+    return true
 end
 
--- HELPER: Linear Gradient Creator
-local function create_smooth_linear_gradient(x0, y0, x1, y1, t)
-    local pat = cairo_pattern_create_linear(x0, y0, x1, y1)
-    cairo_pattern_add_color_stop_rgba(pat, 0, rgb_to_r_g_b(t.fg_colour))
-    cairo_pattern_add_color_stop_rgba(pat, 1, rgb_to_r_g_b(t.alarm_colour or t.fg_colour))
-    if t.mid_colour ~= nil then
-        for i = 1, #t.mid_colour do
-            cairo_pattern_add_color_stop_rgba(pat, t.mid_colour[i][1], rgb_to_r_g_b({t.mid_colour[i][2], t.mid_colour[i][3]}))
+
+
+-- MAIN FUNCTION ----------------------------------------------------------------------------------------------------------------------------
+function conky_main_bars(arg)
+  if conky_window == nil then return "" end
+
+    -- READ SELECTED CONFIG FROM RAM (arg overrides, e.g. ${lua main_bars blocks})
+    local config = arg or config_index[1] or ""
+    if not arg then
+        local sel_file = io.open(eq_config_path, "r")
+        if sel_file then
+            local num = tonumber(sel_file:read("*l"))
+            sel_file:close()
+            if num and config_index[num] then config = config_index[num] end
         end
     end
-    return pat
-end
 
--- DRAWING FUNCTION
-function draw_spectrum_bar(t, cr)
-    cairo_save(cr)
-    
-    -- Setup Geometry
-    local pct = 100 * t.arg / t.max
-    local pcb = 100 / t.blocks
-    
-    cairo_set_line_width(cr, t.height)
-    cairo_translate(cr, t.x, t.y)
-    cairo_rotate(cr, (t.angle or 0) * math.pi / 180)
-
-    -- Draw Multi-Block Bar
-    for pt = 1, t.blocks do
-        local y1 = -(pt - 1) * (t.height + t.space)
-        local col = t.bg_colour
-        local is_on = false
-        
-        if pct >= (pcb * (pt - 1)) and pct > 0 then
-            is_on = true
-            col = t.fg_colour
-            if t.alarm and pct >= (100 * t.alarm / t.max) and (pcb * pt) > (100 * t.alarm / t.max) then
-                col = t.alarm_colour or t.fg_colour
-            end
-        end
-
-        -- Handle Gradients vs Solid
-        if t.smooth and is_on then
-            local pat = create_smooth_linear_gradient(t.width / 2, 0, t.width / 2, -(t.blocks * (t.height + t.space)), t)
-            cairo_set_source(cr, pat)
-            cairo_pattern_destroy(pat)
-        else
-            local r, g, b, a = rgb_to_r_g_b(col)
-            cairo_set_source_rgba(cr, r, g, b, a)
-        end
-
-        cairo_move_to(cr, 0, y1)
-        cairo_line_to(cr, t.width, y1)
-        cairo_stroke(cr)
+    -- CONFIG OUTPUT TO STDOUT
+    if show_config == "on" and config ~= "" then
+      local path = "./spectrum-configs/" .. config
+      local f = io.open(path, "r")
+      if f ~= nil then
+        f:close()
+        print("Loading spectrum config: \27[32m" .. config .."\27[m")
+        print("__________________________________\n")
+        os.execute("cat ".. path .." | awk -F'--' '{print $1}' | awk -F'=' '{print \"\27[97;3m\" $1 \"\27[31m=\27[32m\" $2 \"\27[m\" }'")
+        print("__________________________________\n")
+        show_config = "off"
+      end
     end
-    
-    cairo_restore(cr)
-end
 
--- MAIN ENTRY POINT
-function conky_main_bars(name)
-    if conky_window == nil then return end
-    
-    -- 1. LOAD EXTERNAL CONFIG (Only once per session/name change)
-    if not config_loaded or last_config ~= name then
-        local path = "./spectrum-configs/" .. name
+
+    -- LOAD EXTERNAL CONFIG (Only once per session/name change)
+    if not config_loaded or last_config ~= config then
+        local path = "./spectrum-configs/" .. config
         if io.open(path, "r") then
             local chunk = loadfile(path)
-            if chunk then 
+            if chunk then
                 chunk() -- Executes config and sets global variables
+                last_config = config
+                label_show_until = os.time() + 5
+                -- if live_edit == "on" then le="(\27[31;5mLIVE EDIT\27[m)" else
                 config_loaded = true
-                last_config = name
+                -- end
+                print(SCRIPT_NAME..": \27[32m" .. config .. "\27[m")
             end
         end
     end
 
-    -- 2. READ CAVA DATA (The high-speed optimization)
-    local cava_values = {}
-    local cava_file = io.open("/dev/shm/cava-out.tmp", "r")
-    if cava_file then
-        local line = cava_file:read("*l")
-        cava_file:close()
-        if line then
-            for val in string.gmatch(line, "%S+") do
-                table.insert(cava_values, tonumber(val) or 0)
-            end
+
+   -- READ CAVA DATA (The high-speed optimization)
+   local cava_values = {}
+   local cava_file = io.open(cava_out_path, "r")
+   if cava_file then
+       local line = cava_file:read("*l")
+       cava_file:close()
+       if line then
+           for val in string.gmatch(line, "%S+") do
+             table.insert(cava_values, tonumber(val) or 0)
+           end
+       end
+   end
+
+
+   -- SETUP CAIRO CONTEXT
+   local cs = cairo_xlib_surface_create(conky_window.display, conky_window.drawable, conky_window.visual, conky_window.width, conky_window.height)
+   cr = cairo_create(cs)
+
+
+   -- RENDER BAR LOOP
+   if tonumber(conky_parse('${updates}')) > 3 then
+      for i = 1, (bars or 0) do
+          local k = {
+                     value = cava_values[i] or 0,
+                     max = max or 1000,
+                     cap = cap or "b",
+                     x = x + (i - 1) * (width + (barspaces or 2)),
+                     y = y,
+                     barspaces = barspaces or 2,
+                     angle_bar = angle_bar or 0,
+                     radius = radius or 0,
+                     fg_colour = fg_colour,
+                     bg_colour = bg_colour,
+                     mid_colour = mid_colour,
+                     alarm_colour = alarm_colour,
+                     smooth = smooth,
+                     blockspaces = blockspaces or 2,
+                     blocks = blocks or 10,
+                     height = height or 5,
+                     width = width or 20,
+                     angle = angle or 0,
+                     skew_x = skew_x or 0,
+                     skew_y = skew_y or 0,
+                     reflection = reflection or "b",
+                     reflection_alpha = reflection_alpha or 0,
+                     reflection_length = reflection_length or 0,
+                     reflection_scale = reflection_scale or 1,
+                     alarm = alarm,
+                    }
+          draw_multi_bar_graph(k, cr)
+      end
+   end
+
+
+  -- CONFIG LABEL (enabled via showlabel="on"/"auto" in settings.ini)
+  if config ~= "" and fg_colour and (show_label == "on" or (show_label == "auto" and os.time() < label_show_until)) then
+      local r = ((fg_colour[1] / 0x10000) % 0x100) / 255
+      local g = ((fg_colour[1] / 0x100)   % 0x100) / 255
+      local b = (fg_colour[1]              % 0x100) / 255
+      cairo_select_font_face(cr, "Noto Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL)
+      cairo_set_font_size(cr, 10)
+      cairo_set_source_rgba(cr, r, g, b, fg_colour[2] or 1)
+      local extents = cairo_text_extents_t:create()
+      cairo_text_extents(cr, config, extents)
+      cairo_move_to(cr, (conky_window.width - extents.width) / 2, conky_window.height - 4)
+      cairo_show_text(cr, config)
+  end
+
+
+  -- CLEANUP
+  cairo_destroy(cr)
+  cairo_surface_destroy(cs)
+  return ""
+end
+
+
+
+
+-- DRAW MULTI BARS ---------------------------------------------------------------------------------
+function draw_multi_bar_graph(t)
+  cairo_save(cr)
+
+  --check values
+  if t.max==nil then
+    print ("No maximum value defined, use 'max'")
+    return
+  end
+
+   --set default values
+   if t.x == nil     then t.x = conky_window.width/2 end
+   if t.y == nil     then t.y = conky_window.height/2 end
+   if t.blocks == nil    then t.blocks=10 end
+   if t.height == nil    then t.height=10 end
+   if t.angle == nil     then t.angle=0 end
+   if t.mode == nil      then t.mode="straight" end
+   if t.mode == "round" then
+     circle = 360/bars
+     cblock = circle/blocks
+   end
+   t.angle = t.angle*math.pi/180
+
+   --line cap style
+   if t.cap==nil     then t.cap = "b" end
+   local cap="b"
+   for i,v in ipairs({"s","r","b"}) do
+     if v==t.cap then cap=v end
+   end
+   delta=0
+   if t.cap=="r" or t.cap=="s" then delta = t.height end
+   if cap=="s" then  cap = CAIRO_LINE_CAP_SQUARE
+   elseif cap=="r" then
+     cap = CAIRO_LINE_CAP_ROUND
+   elseif cap=="b" then
+     cap = CAIRO_LINE_CAP_BUTT
+   end
+   --end line cap style
+
+   --if t.led_effect == nil  then t.led_effect="r" end
+   if t.width == nil then t.width=20 end
+   if t.blockspaces == nil   then t.blockspaces=2 end
+   if t.barspaces == nil then t.barspaces=2 end
+   if t.radius == nil    then t.radius=0 end
+
+   if t.angle_bar == nil then t.angle_bar=0 end
+   t.angle_bar = t.angle_bar*math.pi/360 --halt angle
+
+   --colours
+   if t.bg_colour == nil     then t.bg_colour = {0x00FF00,0.5} end
+   if #t.bg_colour ~=2       then t.bg_colour = {0x00FF00,0.5} end
+   if t.fg_colour == nil     then t.fg_colour = {0x00FF00,1} end
+   if #t.fg_colour ~=2       then t.fg_colour = {0x00FF00,1} end
+   if t.alarm_colour == nil  then t.alarm_colour = t.fg_colour end
+   if #t.alarm_colour ~=2    then t.alarm_colour = t.fg_colour end
+
+   if t.mid_colour ~= nil then
+     for i=1, #t.mid_colour do
+         if #t.mid_colour[i]~=3 then
+         print ("error in mid_color table")
+         t.mid_colour[i]={1,0xFFFFFF,1}
+         end
+     end
+   end
+
+   if t.bg_led ~= nil and #t.bg_led ~=2  then t.bg_led = t.bg_colour end
+   if t.fg_led ~= nil and #t.fg_led ~=2  then t.fg_led = t.fg_colour end
+   if t.alarm_led~= nil and #t.alarm_led~=2 then t.alarm_led = t.fg_led end
+
+   if t.alarm == nil then t.alarm = t.max end --0.8*t.max end
+   if t.smooth == nil then t.smooth = false end
+
+   if t.skew_x == nil then
+     t.skew_x=0
+   else
+     t.skew_x = math.pi*t.skew_x/180
+   end
+   if t.skew_y == nil then
+     t.skew_y=0
+   else
+     t.skew_y = math.pi*t.skew_y/180
+   end
+
+   if t.reflection_alpha==nil then t.reflection_alpha=0 end
+   if t.reflection_length==nil then t.reflection_length=1 end
+   if t.reflection_scale==nil then t.reflection_scale=1 end
+  --end of default values
+
+
+
+  local function rgb_to_r_g_b(col_a)
+    return ((col_a[1] / 0x10000) % 0x100) / 255., ((col_a[1] / 0x100) % 0x100) / 255., (col_a[1] % 0x100) / 255., col_a[2]
+  end
+
+
+  --functions used to create patterns
+  local function create_smooth_linear_gradient(x0,y0,x1,y1)
+    local pat = cairo_pattern_create_linear (x0,y0,x1,y1)
+    cairo_pattern_add_color_stop_rgba (pat, 0, rgb_to_r_g_b(t.fg_colour))
+    cairo_pattern_add_color_stop_rgba (pat, 1, rgb_to_r_g_b(t.alarm_colour))
+    if t.mid_colour ~=nil then
+      for i=1, #t.mid_colour do
+        cairo_pattern_add_color_stop_rgba (pat, t.mid_colour[i][1], rgb_to_r_g_b({t.mid_colour[i][2],t.mid_colour[i][3]}))
+      end
+    end
+    return pat
+  end
+
+  local function create_smooth_radial_gradient(x0,y0,r0,x1,y1,r1)
+    local pat =  cairo_pattern_create_radial (x0,y0,r0,x1,y1,r1)
+    cairo_pattern_add_color_stop_rgba (pat, 0, rgb_to_r_g_b(t.fg_colour))
+    cairo_pattern_add_color_stop_rgba (pat, 1, rgb_to_r_g_b(t.alarm_colour))
+    if t.mid_colour ~=nil then
+      for i=1, #t.mid_colour do
+        cairo_pattern_add_color_stop_rgba (pat, t.mid_colour[i][1], rgb_to_r_g_b({t.mid_colour[i][2],t.mid_colour[i][3]}))
+      end
+    end
+    return pat
+  end
+
+  local function create_led_linear_gradient(x0,y0,x1,y1,col_alp,col_led)
+    local pat = cairo_pattern_create_linear (x0,y0,x1,y1) ---delta, 0,delta+ t.width,0)
+    cairo_pattern_add_color_stop_rgba (pat, 0.0, rgb_to_r_g_b(col_alp))
+    cairo_pattern_add_color_stop_rgba (pat, 0.5, rgb_to_r_g_b(col_led))
+    cairo_pattern_add_color_stop_rgba (pat, 1.0, rgb_to_r_g_b(col_alp))
+    return pat
+  end
+
+  local function create_led_radial_gradient(x0,y0,r0,x1,y1,r1,col_alp,col_led,mode)
+    local pat = cairo_pattern_create_radial (x0,y0,r0,x1,y1,r1)
+    if mode==3 then
+      cairo_pattern_add_color_stop_rgba (pat, 0, rgb_to_r_g_b(col_alp))
+      cairo_pattern_add_color_stop_rgba (pat, 0.5, rgb_to_r_g_b(col_led))
+      cairo_pattern_add_color_stop_rgba (pat, 1, rgb_to_r_g_b(col_alp))
+    else
+      cairo_pattern_add_color_stop_rgba (pat, 0, rgb_to_r_g_b(col_led))
+      cairo_pattern_add_color_stop_rgba (pat, 1, rgb_to_r_g_b(col_alp))
+    end
+    return pat
+  end
+
+
+
+  local function draw_single_bar()
+    --this fucntion is used for bars with a single block (blocks=1) but
+    --the drawing is cut in 3 blocks : value/alarm/background
+    --not zvzimzblr for circular bar
+    local function create_pattern(col_alp,col_led,bg)
+      local pat
+      if not t.smooth then
+        if bg then
+          pat = cairo_pattern_create_rgba  (rgb_to_r_g_b(t.bg_colour))
+        else
+          pat = create_smooth_linear_gradient(t.width/2, 0, t.width/2,-t.height)
         end
+      end
+      return pat
     end
 
-    -- 3. SETUP CAIRO CONTEXT
-    local cs = cairo_xlib_surface_create(conky_window.display, conky_window.drawable, conky_window.visual, conky_window.width, conky_window.height)
-    local cr = cairo_create(cs)
-
-    -- 4. RENDER LOOP
-    if tonumber(conky_parse('${updates}')) > 3 then
-        for i = 1, (bars or 0) do
-            local k = {
-                arg = cava_values[i] or 0,
-                max = max or 100,
-                alarm = alarm,
-                x = x + (i - 1) * (width + (barspaces or 2)),
-                y = y,
-                blocks = blocks or 10,
-                height = height or 5,
-                width = width or 20,
-                space = blockspaces or 2,
-                fg_colour = fg_colour,
-                bg_colour = bg_colour,
-                alarm_colour = alarm_colour,
-                smooth = smooth,
-                mid_colour = mid_colour,
-                angle = angle or 0
-            }
-            draw_spectrum_bar(k, cr)
-        end
+    local y1=-t.height*pct/100
+    local y2=nil
+    if pct>(100*t.alarm/t.max) then
+      y1 = -t.height*t.alarm/100
+      y2 = -t.height*pct/100
+      if t.smooth then y1=y2 end
     end
 
-    -- 5. CLEANUP
-    cairo_destroy(cr)
-    cairo_surface_destroy(cs)
-    return ""  -- keeps conky happy if calling from the TEXT section
+    if t.angle_bar==0 then
+
+      --block for fg value
+      pat = create_pattern(t.fg_colour,t.fg_led,false)
+      cairo_set_source(cr,pat)
+      cairo_rectangle(cr,0,0,t.width,y1)
+      cairo_fill(cr)
+
+      -- block for alarm value
+      if not t.smooth and y2 ~=nil then
+        pat = create_pattern(t.alarm_colour,t.alarm_led,false)
+        cairo_set_source(cr,pat)
+        cairo_rectangle(cr,0,y1,t.width,y2-y1)
+        cairo_fill(cr)
+        y3=y2
+      else
+        y2,y3=y1,y1
+      end
+      -- block for bg value
+      cairo_rectangle(cr,0,y2,t.width,-t.height-y3)
+      pat = create_pattern(t.bg_colour,t.bg_led,true)
+      cairo_set_source(cr,pat)
+      cairo_pattern_destroy(pat)
+      cairo_fill(cr)
+    end
+  end  --end single bar
+
+
+
+  local function draw_multi_bar()
+    --function used for bars with 2 or more blocks
+    for pt = 1,t.blocks do
+      --set block y
+      local y1 = -(pt-1)*(t.height+t.blockspaces)
+      local light_on=false
+
+      --set colors
+      local col_alp = t.bg_colour
+      local col_led = t.bg_led
+      if pct>=(100/t.blocks) or pct>0 then --ligth on or not the block
+        if pct>=(pcb*(pt-1))  then
+          light_on = true
+          col_alp = t.fg_colour
+          col_led = t.fg_led
+          if pct>=(100*t.alarm/t.max) and (pcb*pt)>(100*t.alarm/t.max) then
+            col_alp = t.alarm_colour
+            col_led = t.alarm_led
+          end
+        end
+      end
+
+      --set colors
+      --have to try to create gradients outside the loop ?
+      local pat
+
+      if not t.smooth then
+        if t.angle_bar==0 then
+          if t.led_effect=="e" then
+            pat = create_led_linear_gradient (-delta, 0,delta+ t.width,0,col_alp,col_led)
+          elseif t.led_effect=="a" then
+            pat = create_led_linear_gradient (t.width/2, -t.height/2+y1,t.width/2,0+t.height/2+y1,col_alp,col_led)
+          elseif  t.led_effect=="r" then
+            pat = create_led_radial_gradient (t.width/2, y1, 0, t.width/2,y1,t.width/1.5,col_alp,col_led,2)
+          else
+            pat = cairo_pattern_create_rgba  (rgb_to_r_g_b(col_alp))
+          end
+        else
+           if t.led_effect=="a"  then
+             pat = create_led_radial_gradient (0, 0, t.radius+(t.height+t.blockspaces)*(pt-1), 0, 0, t.radius+(t.height+t.blockspaces)*(pt), col_alp,col_led,3)
+          else
+            pat = cairo_pattern_create_rgba  (rgb_to_r_g_b(col_alp))
+          end
+        end
+      else
+
+        if light_on then
+          if t.angle_bar==0 then
+            pat = create_smooth_linear_gradient(t.width/2, t.height/2, t.width/2,-(t.blocks-0.5)*(t.height+t.blockspaces))
+          else
+            pat = create_smooth_radial_gradient(0, 0, (t.height+t.blockspaces),  0,0,(t.blocks+1)*(t.height+t.blockspaces),2)
+          end
+        else
+          pat = cairo_pattern_create_rgba  (rgb_to_r_g_b(t.bg_colour))
+        end
+      end
+      cairo_set_source (cr, pat)
+      cairo_pattern_destroy(pat)
+
+      --draw a block
+      if t.angle_bar==0 then
+        cairo_move_to(cr,0,y1)
+        cairo_line_to(cr,t.width,y1)
+      else
+        cairo_arc( cr,0,0,
+          t.radius+(t.height+t.blockspaces)*(pt)-t.height/2,
+           -t.angle_bar -math.pi/2 ,
+           t.angle_bar -math.pi/2)
+      end
+      cairo_stroke(cr)
+    end
+  end
+
+
+  local function setup_bar_graph()
+    --function used to retrieve the value to display and to set the cairo structure
+    if t.blocks ~=1 then t.y=t.y-t.height/2 end
+
+    pct = 100*t.value/t.max
+    pcb = 100/t.blocks
+
+    cairo_set_line_width (cr, t.height)
+    cairo_set_line_cap  (cr, cap)
+    cairo_translate(cr,t.x,t.y)
+    cairo_rotate(cr,t.angle)
+
+    local matrix0 = cairo_matrix_t:create()
+    cairo_matrix_init (matrix0, 1,t.skew_y,t.skew_x,1,0,0)
+    cairo_transform(cr,matrix0)
+
+
+    --call the drawing function for blocks
+    if t.blocks==1 and t.angle_bar==0 then
+      draw_single_bar()
+      if t.reflection=="t" or t.reflection=="b" then cairo_translate(cr,0,-t.height) end
+    else
+      draw_multi_bar()
+    end
+
+    --call the drawing function for reflection and prepare the mask used
+    if t.reflection_alpha>0 and t.angle_bar==0 then
+      local pat2
+      local matrix1 = cairo_matrix_t:create()
+      if t.angle_bar==0 then
+        pts={-delta/2,(t.height+t.blockspaces)/2,t.width+delta,-(t.height+t.blockspaces)*(t.blocks)}
+        if t.reflection=="t" then
+          cairo_matrix_init (matrix1,1,0,0,-t.reflection_scale,0,-(t.height+t.blockspaces)*(t.blocks-0.5)*2*(t.reflection_scale+1)/2)
+          pat2 = cairo_pattern_create_linear (t.width/2,-(t.height+t.blockspaces)*(t.blocks),t.width/2,(t.height+t.blockspaces)/2)
+        elseif t.reflection=="r" then
+          cairo_matrix_init (matrix1,-t.reflection_scale,0,0,1,delta+2*t.width,0)
+          pat2 = cairo_pattern_create_linear (delta/2+t.width,0,-delta/2,0)
+        elseif t.reflection=="l" then
+          cairo_matrix_init (matrix1,-t.reflection_scale,0,0,1,-delta,0)
+          pat2 = cairo_pattern_create_linear (-delta/2,0,delta/2+t.width,-0)
+        else --bottom
+          cairo_matrix_init (matrix1,1,0,0,-1*t.reflection_scale,0,(t.height+t.blockspaces)*(t.reflection_scale+1)/2)
+          pat2 = cairo_pattern_create_linear (t.width/2,(t.height+t.blockspaces)/2,t.width/2,-(t.height+t.blockspaces)*(t.blocks))
+        end
+      end
+      cairo_transform(cr,matrix1)
+
+      if t.blocks==1 and t.angle_bar==0 then
+        draw_single_bar()
+        cairo_translate(cr,0,-t.height/2)
+      else
+        draw_multi_bar()
+      end
+
+      cairo_set_line_width(cr,0.01)
+      cairo_pattern_add_color_stop_rgba (pat2, 0,0,0,0,1-t.reflection_alpha)
+      cairo_pattern_add_color_stop_rgba (pat2, t.reflection_length,0,0,0,1)
+      if t.angle_bar==0 then
+        cairo_rectangle(cr,pts[1],pts[2],pts[3],pts[4])
+      end
+      cairo_clip_preserve(cr)
+      cairo_set_operator(cr,CAIRO_OPERATOR_CLEAR)
+      cairo_stroke(cr)
+      cairo_mask(cr,pat2)
+      cairo_pattern_destroy(pat2)
+      cairo_set_operator(cr,CAIRO_OPERATOR_OVER)
+
+    end --reflection
+
+
+  end --setup_bar_graph()
+
+
+  --start here !
+  setup_bar_graph()
+  cairo_restore(cr)
+
+ return "" -- Keep conky happy with some return output to text block
 end
