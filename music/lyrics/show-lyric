@@ -28,14 +28,23 @@ if [ "$status" != "Playing" ]; then
 fi
 
 # position returns seconds as a float (e.g. "74.502000"), NOT microseconds
-position_sec=$(playerctl -p "$player_name" position 2>/dev/null)
-if [ -z "$position_sec" ]; then
-    > "$outfile"
-    exit
+# For streams, playerctl reports cumulative stream time — use wall-clock elapsed instead.
+if [ -f "$TMP/track_type" ] && [ "$(< "$TMP/track_type")" = "stream" ] && [ -f "$TMP/song_start" ]; then
+    position_sec=$(awk -v now="$(date +%s.%3N)" -v start="$(< "$TMP/song_start")" 'BEGIN{t=now-start; if(t<0)t=0; printf "%.3f",t}')
+else
+    position_sec=$(playerctl -p "$player_name" position 2>/dev/null)
+    if [ -z "$position_sec" ]; then
+        > "$outfile"
+        exit
+    fi
 fi
 
-# Apply timing offset in seconds
-if [ "${timing:-0}" != "0" ]; then
+# Apply timing offset — stream_timing for streams, timing for local files
+if [ -f "$TMP/track_type" ] && [ "$(< "$TMP/track_type")" = "stream" ]; then
+    if [ "${stream_timing:-0}" != "0" ]; then
+        position_sec=$(awk "BEGIN{printf \"%.3f\", $position_sec + $stream_timing}")
+    fi
+elif [ "${timing:-0}" != "0" ]; then
     position_sec=$(awk "BEGIN{printf \"%.3f\", $position_sec + $timing}")
 fi
 

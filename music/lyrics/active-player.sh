@@ -36,10 +36,14 @@ handle_line() {
     if [ "$status" = "Playing" ]; then
         echo -n "$pname" > "$TMP/player.running"
 
-        # Stream split: mirrors nowplaying.lua
+        # Stream split: mirrors nowplaying.lua.
+        # For streams using "Artist - Title" in the title field, no " - " means
+        # it's a commercial or station ID — skip entirely.
         if [ -z "$artist" ] || [ "$artist" = "null" ]; then
             if [[ "$title" == *" - "* ]]; then
                 artist="${title%% - *}"; title="${title#* - }"
+            elif [[ "$track_url" == http://* || "$track_url" == https://* ]]; then
+                return
             fi
         elif [ -z "$art_url" ]; then
             if [[ "$title" == *" - "* ]]; then
@@ -47,15 +51,29 @@ handle_line() {
                 if [ "$ta" != "$artist" ]; then
                     artist="$ta"; title="${title#* - }"
                 fi
+            elif [[ "$track_url" == http://* || "$track_url" == https://* ]]; then
+                return
             fi
         fi
 
-        local current="$artist|$title|$album"
+        # Stream URLs (http/https) never provide a real album — the album field
+        # is just the stream domain, which breaks the LRCLIB album_name lookup.
         local save_flag=""
-        [[ "$track_url" == file://* ]] && save_flag="--save"
+        if [[ "$track_url" == http://* ]] || [[ "$track_url" == https://* ]]; then
+            album=""
+            echo "stream" > "$TMP/track_type"
+        else
+            [[ "$track_url" == file://* ]] && save_flag="--save"
+            rm -f "$TMP/track_type"
+        fi
+
+        local current="$artist|$title|$album"
 
         if [ "$current" != "$last_song" ]; then
             last_song="$current"
+            # For streams, record wall-clock start time — playerctl position is
+            # cumulative stream time, not position within the current track.
+            [[ "$track_url" == http://* || "$track_url" == https://* ]] && date +%s.%3N > "$TMP/song_start"
             > "$TMP/lyrics.txt"
             > "$TMP/lyrics.out"
             rm -f "$TMP/lyrics.parsed"
