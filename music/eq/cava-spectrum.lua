@@ -637,9 +637,11 @@ function draw_multi_bar_graph(t)
     cairo_translate(cr,t.x,t.y)
     cairo_rotate(cr,t.angle)
 
-    local matrix0 = cairo_matrix_t:create()
-    cairo_matrix_init (matrix0, 1,t.skew_y,t.skew_x,1,0,0)
-    cairo_transform(cr,matrix0)
+    if t.skew_x ~= 0 or t.skew_y ~= 0 then
+      local matrix0 = cairo_matrix_t:create(); tolua.takeownership(matrix0)
+      cairo_matrix_init (matrix0, 1,t.skew_y,t.skew_x,1,0,0)
+      cairo_transform(cr,matrix0)
+    end
 
 
     --call the drawing function for blocks
@@ -653,7 +655,7 @@ function draw_multi_bar_graph(t)
     --call the drawing function for reflection and prepare the mask used
     if t.reflection_alpha>0 and t.angle_bar==0 then
       local pat2
-      local matrix1 = cairo_matrix_t:create()
+      local matrix1 = cairo_matrix_t:create(); tolua.takeownership(matrix1)
       if t.angle_bar==0 then
         local pts={-delta/2,(t.height+t.blockspaces)/2,t.width+delta,-(t.height+t.blockspaces)*(t.blocks)}
         if t.reflection=="t" then
