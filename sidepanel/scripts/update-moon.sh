@@ -141,7 +141,7 @@ fi
 
 
 if [[ "$1" == "--transform" || "$1" == "-t" ]]; then
-    ${SCRIPT_DIR}/moon-rotate.lua "${OUTPUT_DIR}/moon.png" 
+    lua "${SCRIPT_DIR}/moon-rotate.lua"
     log "${OUTPUT_DIR}/moon.png angle rotated"
 fi
 
